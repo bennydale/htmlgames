@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Canvas</title>
+</head>
+<style>
+	body {
+		margin: 0;
+		overflow: hidden;
+	}
+</style>
+<body>
+	<canvas id="firstCanvas" width="500" height="900"></canvas>
+
+	<script>
+
+var blockSize = 4;
+
+const spritePrototype = {
+    getWidth() {
+        return this.bmap[0].length * blockSize
+    },
+    getHeight() {
+        return this.bmap.length * blockSize
+    },
+    setPos(pos){
+        this.x = pos.x;
+        this.y = pos.y;
+    },
+    draw(){
+        for(i=0;i<this.bmap.length;i++){
+            for(j=0;j<this.bmap[i].length;j++){
+                switch( this.bmap[i].charAt(j) ){
+                    case "1":
+                        context.fillStyle = 'black'
+                        break;
+                    case "2":
+                        context.fillStyle = 'white'
+                        break
+                    case "3":
+                        context.fillStyle = 'peachpuff'
+                        break;
+                    case "4":
+                        context.fillStyle = 'rgb(17, 176, 212)' // blue
+                        break;
+                    case "5":
+                        context.fillStyle = 'red'
+                        break;
+                }
+                if ( this.bmap[i].charAt(j) !== "0"){
+                    context.fillRect(this.x + (j*blockSize), this.y + (i*blockSize), blockSize, blockSize);
+                }
+            }
+        }
+    }
+    
+}
+function Sprite(byteMap, x=0, y=0) {
+  this.bmap = byteMap;
+  this.x = x;
+  this.y = y;
+}
+
+Sprite.prototype = spritePrototype;
+Sprite.prototype.constructor = Sprite;
+
+const playerBmap = [
+"0444400",
+"4444440",
+"0313130",
+"0005000",
+"3355533",
+"0005000",
+"0444440",
+"0200020",
+"0100010"
+];
+
+// remember to change the color of his cap
+const footballplayerMap =[
+"0555550",
+"0513150",
+"0313130",
+"0004000",
+"2344432",
+"0004000",
+"0111110",
+"0100010",
+"0200020"
+] 
+const fireworkMap =[
+"0134534",
+"1145345",
+"0153453"
+] 
+
+
+// remember to change the color of the 0's on his head
+        var TOTAL_HEIGHT = 900;
+
+		var canvas = document.getElementById("firstCanvas");
+
+		const context = canvas.getContext('2d');
+
+        
+        function drawBG(){
+            context.fillStyle = 'green';
+            context.fillRect(0, 0, 500, TOTAL_HEIGHT);
+
+            context.strokeStyle = 'white';
+            context.strokeRect(50, 50, 400, 800);
+            for(var i = 50; i < 850; i =i+50 ){
+                context.strokeRect(50, i, 400, 25);
+            }
+
+        }
+
+        // utility functions
+        function getRandomInt(max) {
+            return Math.floor(Math.random() * max);
+        }
+        function getRandomIntFromInterval(min, max) { // min and max included 
+            return Math.floor(Math.random() * (max - min + 1) + min)
+        }
+        function doSpritesOverlay(s1, s2) {
+
+            topLeft1 = [s1.x, s1.y];
+            bottomRight1 = [s1.x+s1.getWidth(), s1.y+s1.getHeight()];
+            topLeft2 =  [s2.x, s2.y];
+            bottomRight2 = [s2.x+s2.getWidth(), s2.y+s2.getHeight()];
+
+            if (topLeft1[0] > bottomRight2[0] || topLeft2[0] > bottomRight1[0]) {
+                return false;
+            }
+            if (topLeft1[1] > bottomRight2[1] || topLeft2[1] > bottomRight1[1]) {
+                return false;
+            }
+            return true;
+        }
+
+
+        var moveAmount = 10;
+        var fAttached = false;
+        var fCooldown = 10;
+        
+        var padUp = false;
+        var padDown = false;
+        var padLeft = false;
+        var padRight = false;
+
+        var pMap = [];
+        // init the player
+        var player = new Sprite(playerBmap, 50,50) 
+        var firework = new Sprite(fireworkMap, getRandomIntFromInterval(75,200), getRandomIntFromInterval(100, 150))
+
+        function drawWorld(){
+            drawBG()
+            // position player: 
+            if(padUp){
+                player.y = player.y - moveAmount
+                if( fAttached){
+                    firework.y = firework.y - moveAmount
+                }
+            }
+            if(padDown){
+                player.y = player.y + moveAmount
+                if( fAttached){
+                    firework.y = firework.y+ moveAmount
+                }
+            }
+            if(padLeft){
+                player.x = player.x - moveAmount
+                if( fAttached){
+                    firework.x = firework.x - moveAmount
+                }
+            }
+            if(padRight){
+                player.x = player.x + moveAmount
+                if( fAttached){
+                    firework.x = firework.x + moveAmount
+                }
+            }
+            // check if firework should be attached: 
+            if( doSpritesOverlay(firework, player) && fCooldown < 0 ){
+                // do something
+                fAttached = true;
+            } else {
+                fCooldown--;
+            }
+
+            // firework down
+            firework.draw()   
+
+              
+
+            // draw player:
+            //drawFromByteMap(player.x, player.y, maincharecter)
+            player.draw()
+
+            // draw any NPC in the pMap
+            drawNPCs()
+            
+        }
+        function drawNPCs(){
+            if( pMap.length < 6 ){
+                // 1 in 40 chance to draw another player
+                if( getRandomInt(40) == 0 ){
+                    pMap.push(
+                        new Sprite(footballplayerMap, 
+                            getRandomInt(450)+50,
+                            0
+                        )
+                    )
+                }
+            }
+            for(var i=0;i<pMap.length;i++){
+                // move down random amount
+                pMap[i].y =  pMap[i].y + getRandomInt(10)
+                pMap[i].draw();
+            }
+            // remove any NPCs past the finish line
+            pMap = pMap.filter(function(p) {
+                return p.y < TOTAL_HEIGHT
+            })
+        }
+
+        // gameloop
+		setInterval(function () {
+            drawWorld()
+        },50);
+
+        // bindings: 
+        window.addEventListener("keydown", pressedKey);
+		function pressedKey() {
+			directionVar = event.key.replace("Arrow", "");
+			switch (directionVar) {
+				case "Up":
+                	padUp = true
+				break;
+				case "Down":
+                	padDown = true
+				break;
+                case "Left":
+                	padLeft = true
+				break;
+				case "Right":
+                	padRight = true
+				break;
+			}
+		}
+
+		window.addEventListener("keyup", pressedKeyUp);
+		function pressedKeyUp() {
+			directionVar = event.key.replace("Arrow", "");
+			switch (directionVar) {
+				case "Up":
+                    padUp = false
+				break;
+				case "Down":
+                    padDown = false
+				break;
+                case "Left":
+                	padLeft = false
+				break;
+				case "Right":
+                	padRight = false
+				break;
+                case " ":
+                    fAttached = false;
+                    fCooldown = 10
+                    break;
+			}
+		}
+
+	</script>
+
+</body>
+
+</html>

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Canvas</title>
+</head>
+<style>
+	body {
+		margin: 0;
+		overflow: hidden;
+	}
+</style>
+
+<body>
+	<canvas id="firstCanvas" width="1000" height="500"></canvas>
+
+    <script>
+    
+		var moveA = 11
+		var PADDLE_2_XPOS = 980
+		var PADDLE_1_XPOS = 15
+		var PADDLE_HEIGHT = 50
+		var BALL_HEIGHT =10
+		var hitsoundaffect = new Audio('hitsoundaffect.wav');
+		var losingsound = new Audio( 'losingnoise.wav')
+
+		var player1score = 0
+		var player2score = 0
+        var canvas = document.getElementById("firstCanvas");
+        const context = canvas.getContext('2d');
+		
+		var paddle1 = 250
+		var paddle2 = 250
+		var ball = {
+			x: 500, 
+			y: 250
+		}
+
+
+		var p1Up = false
+		var p1Down = false
+		var p2Up = false
+		var p2Down= false
+		var ballmovement = {
+			x:2, 
+			y:2
+		}
+		function getRandomArbitrary(min, max) {
+			return Math.random() * (max - min) + min;
+		}
+		function resetBall(){
+			losingsound.play()
+			ball = {
+				x: 500, 
+				y: 250
+			}
+			ballmovement={x:0,y:0}
+			var direction = getRandomArbitrary(-1,1) > 0 ? 1 :-1
+			setTimeout(function(){
+				ballmovement={
+					x:3 *direction,
+					y:getRandomArbitrary(-2,2)
+				}
+			},1000)
+		}
+        function drawWorld() {
+            context.fillStyle = 'rgb(0, 0, 0)';
+			context.fillRect(0, 0, 1000, 500);
+
+			context.fillStyle = 'rgb(250, 250, 250)';
+
+			if (p1Up){
+				paddle1 = paddle1 - moveA
+			}
+			if (p1Down){
+				paddle1 = paddle1 + moveA
+			}
+			if (p2Up){
+				paddle2 = paddle2 - moveA
+			} 
+			if (p2Down){
+				paddle2 = paddle2 + moveA
+			} 
+			// draw paddles
+			context.fillRect (PADDLE_1_XPOS,paddle1,7, PADDLE_HEIGHT)
+			context.fillRect (PADDLE_2_XPOS,paddle2,7, PADDLE_HEIGHT)
+
+
+			ball.x = ball.x + ballmovement.x
+			ball.y = ball.y + ballmovement.y
+
+			if (ball.y > 500-BALL_HEIGHT || ball.y < 0+BALL_HEIGHT){
+				ballmovement.y = ballmovement.y * -1
+			}
+			
+		
+
+			if (ball.x > PADDLE_2_XPOS){
+				if (ball.y > paddle2 && ball.y < paddle2 + PADDLE_HEIGHT ){
+					hitsoundaffect.play()
+					ballmovement.x = ballmovement.x * -1.1
+				} else {
+					console.log(" player 1 wins")
+					player1score++;
+					losingsound.play()
+					resetBall()
+				}
+			} 
+
+			if (ball.x < PADDLE_1_XPOS){
+				if (ball.y > paddle1 && ball.y < paddle1 + PADDLE_HEIGHT ){
+					hitsoundaffect.play()
+					ballmovement.x = ballmovement.x * -1.1
+				} else {
+					console.log(" player 2 wins")
+					player2score++
+					resetBall()
+				}
+
+			}
+			if (ballmovement.x > 9 ) {
+				ballmovement.x = 9
+			}
+			
+			context.font = '60px serif';
+			context.fillText(player1score, 10, 50);
+			context.fillText(player2score, 950, 50);
+
+			context.fillRect(ball.x,ball.y, BALL_HEIGHT, BALL_HEIGHT)
+
+        }
+
+
+		setInterval(function () {
+			drawWorld()
+		}, 15);
+
+
+		window.addEventListener("keydown", pressedKey);
+		function pressedKey() {
+			directionVar = event.key.replace("Arrow", "");
+			switch (directionVar) {
+				case "Up":
+                	p2Up = true
+				break;
+
+				case "Down":
+                	p2Down = true
+				break;
+
+				case "w":
+					p1Up = true
+				break;
+
+				case "s":
+					p1Down = true
+				break;
+
+			}
+		}
+
+		window.addEventListener("keyup", pressedKeyUp);
+		function pressedKeyUp() {
+			directionVar = event.key.replace("Arrow", "");
+			switch (directionVar) {
+
+				case "w":
+					p1Up =false
+				break;
+				case "s":
+					p1Down = false
+				break;
+				case "Up":
+                	p2Up = false
+				break;
+				case "Down":
+                	p2Down = false
+				break;
+			}
+		}
+    </script>
+</body>
+</html>

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Canvas</title>
+</head>
+<style>
+	body {
+		margin: 0;
+		overflow: hidden;
+	}
+</style>
+<body>
+	<canvas id="firstCanvas" width="500" height="500"></canvas>
+
+	<script>
+
+		var canvas = document.getElementById("firstCanvas");
+
+		const context = canvas.getContext('2d');
+
+		var moveA = 5
+		var x = 10
+		var y = 10
+		var direction = "Left"
+		var etInx = 0
+		var sciInx =8
+		var scientist = {
+			active: false,
+			x: 400,
+			y: 40,
+			mapX: 1,
+			mapY: 1 
+		} 
+		function getRandomInt(max,floor=0) {
+			var randomnumber = Math.floor(Math.random() * max);
+			if(randomnumber < floor){
+				return floor
+			}
+			return randomnumber
+		}
+
+		// generate the maps
+		var currentMapCordinates = {x: 1, y:1}
+		var holesMap = {}
+		for (var i = 0; i < 4; i++) {
+			holesMap[i] =[]
+			for (var j = 0; j < 4; j++) {
+				if( typeof holesMap[i][j] == 'undefined' ) {
+					holesMap[i][j] = []
+				}
+				for (var k = 0; k < 5; k++) {
+					if( i == 3 && j == 3){
+						// no holes
+					} else {
+						holesMap[i][j].push([getRandomInt(450), getRandomInt(450), getRandomInt(50,30), getRandomInt(50,30)])
+					}
+				}
+			}
+		}
+
+		var worldType = "holes"
+
+		etImageSet = [
+			'et.png',
+			'et-walking-frame-1.png',
+			'et-walking-frame-2.png',
+			'et-n-up1.png',
+			'et-n-up2.png',
+			'et-n-up3.png',
+			'bg.png', // 6
+			'citybackground.png',
+			'scientistframe1.png', //8
+			'scientistframe2.png' //9 
+		]
+		var imgArray = new Array()
+		etImageSet.forEach((imgItem, i) => {
+			imgArray[i] = new Image();
+			imgArray[i].src = etImageSet[i]
+			imgArray[i].onload = areWeDoneYet
+		});
+		var doneYetInx = 0;
+		function areWeDoneYet() {
+			doneYetInx++
+			if (doneYetInx == etImageSet.length - 1) {
+				drawWorld()
+			}
+		}
+        // gameloop
+		setInterval(function () {
+
+			if (scientist.active && scientist.mapX == currentMapCordinates.x && scientist.mapY == currentMapCordinates.y ){
+				if (x < scientist.x){
+					scientist.x = scientist.x - moveA
+				}
+				if (y < scientist.y){
+					scientist.y = scientist.y - (moveA*2)
+				}
+				if (x > scientist.x){
+					scientist.x = scientist.x + moveA
+				}
+				if (y > scientist.y){
+					scientist.y = scientist.y + moveA
+				}
+
+				if (x == scientist.x && y == scientist.y ) {
+					currentMapCordinates.x = 3
+					currentMapCordinates.y = 3
+				}
+
+
+			}
+
+
+			// update 
+			drawWorld()
+		}, 100);
+
+		function drawWorld() {
+			switch (worldType) {
+				case "holes":
+					context.fillStyle = 'rgb(25, 100, 25)';
+					context.fillRect(0, 0, 500, 500);
+
+					if( currentMapCordinates.x == 3 && currentMapCordinates.y == 3){
+						context.drawImage(imgArray[7], 0, 0);
+	
+					} else {
+						if( scientist.active && scientist.mapX == currentMapCordinates.x && scientist.mapY == currentMapCordinates.y ){
+							if( sciInx == 8 ){
+								sciInx = 9
+							} else {
+								sciInx = 8 
+							}
+
+							context.drawImage(imgArray[sciInx], scientist.x, scientist.y);
+						}
+					}
+					// draw holes
+					context.fillStyle = 'rgb(15, 50, 15)';
+
+					context.font = "30px Arial";
+					context.fillText(currentMapCordinates.x + "," + currentMapCordinates.y, 450, 23);
+
+					var hMap =  holesMap[currentMapCordinates.x][currentMapCordinates.y];
+					hMap.forEach(hole => {
+						context.fillRect(hole[0], hole[1], hole[2], hole[3]);
+					})
+					break;
+				case "cave":
+					context.drawImage(imgArray[6], 0, 0);
+					break;
+			}
+
+			// draw ET
+			context.fillStyle = "#6c2c3a";
+			drawImageDirection(context, imgArray[etInx], x, y, direction == "Left")
+		}
+
+		function drawImageDirection(ctx, image, x = 0, y = 0, horizontal = false, vertical = false) {
+			ctx.save();  // save the current canvas state
+			ctx.setTransform(
+				horizontal ? -1 : 1, 0, // set the direction of x axis
+				0, vertical ? -1 : 1,   // set the direction of y axis
+				x + (horizontal ? image.width : 0), // set the x origin
+				y + (vertical ? image.height : 0)   // set the y origin
+			);
+			ctx.drawImage(image, 0, 0);
+			ctx.restore(); // restore the state as it was when this function was called
+		}
+
+		function checkColisions() {
+			foundCollision =false
+			var hMapSet =  holesMap[currentMapCordinates.x][currentMapCordinates.y];
+			hMapSet.forEach(hMap => {
+				if(( x + 24 > hMap[0] && x < hMap[0]+ hMap[2]) && ( y + 28 > hMap[1] && y < hMap[1]+ hMap[3])){
+					foundCollision = true
+				}
+			})
+			return foundCollision
+		}
+		var headDirection = 'up'
+		//EventListener to check which arrow key is pressed
+		window.addEventListener("keydown", pressedKey);
+		function pressedKey() {
+
+			directionVar = event.key.replace("Arrow", "");
+			//console.log(directionVar, x, y)
+			
+			switch (directionVar) {
+				case "3":
+						currentMapCordinates.x = 3 
+						currentMapCordinates.y = 3 
+					break;
+				case "+": 
+					scientist.active = true
+					break; 
+				case " ":
+					if (worldType == "cave") {
+						y = y - moveA
+					}
+					break
+				case "Up":
+					if (worldType == "holes") {
+						y = y - moveA
+					}
+					break;
+				case "Down":
+					y = y + moveA
+					break;
+				case "Left":
+					x = x - moveA
+					direction = "Right"
+					break;
+				case "Right":
+					x = x + moveA
+					direction = "Left"
+					break;
+			}
+
+			// check collisions 
+			if (worldType == "holes" && checkColisions() == true) {
+				worldType = "cave"
+				x = 250
+				y = 440
+			}
+			if (worldType == "cave") {
+				if (y < 0) {
+					worldType = "holes"
+				}
+			} 
+			// check out of bounds: 
+			if (worldType == "holes"){
+				if (x < 0) {
+					if (currentMapCordinates.x == 0){
+						x = x + moveA
+					} else{
+						currentMapCordinates.x--
+						x = 480
+					}  
+				}
+				if (x > 480){
+					if (currentMapCordinates.x == 3){
+						x = x - moveA
+					} else{
+						currentMapCordinates.x++
+						x = 0
+					}
+				}
+				if (y < 0) {
+					if (currentMapCordinates.y == 0){
+						y = y + moveA
+					} else {
+						currentMapCordinates.y--
+						y = 480
+					}
+				}
+				if (y > 480) {
+					if (currentMapCordinates.y == 3){
+						y = y - moveA
+					} else{
+						currentMapCordinates.y++
+						y = 0
+					}
+				}
+			}
+			var keyPressed = event.key;
+			if( event.key == " "){
+				if( etInx < 3){
+					etInx = 3
+				}
+				etInx++
+				if (etInx == 6) {
+					etInx = 5
+				}
+			} else if (keyPressed.indexOf('Arrow') != -1) {
+				etInx = etInx + 1
+				if (etInx >= 3) {
+					etInx = 0
+				}
+			}
+			drawWorld()
+		}
+
+
+
+	</script>
+
+</body>
+
+</html>
