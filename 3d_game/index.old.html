@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>3d game</title>
+</head>
+<style>
+	body {
+		margin: 0;
+		overflow: hidden;
+	}
+</style>
+
+<body>
+    <h1>3d game</h1>
+	<canvas id="overheadMap" width="500" height="500" style="float:left;border:1px solid #000000"></canvas>
+    <canvas id="fpmap" width="500" height="500" style="float:left;border:1px solid #000000"></canvas>
+    <script>
+        const map1 =[
+        "111111111111111111111111111111111111",
+        "100100000000000011111100000000000001",
+        "100100111111111110000100000100111111",
+        "100100000000000010000100000100000001",
+        "100111111111110010000000000100000001",
+        "100100000000000011111100000100000001",
+        "100100111111111110000100000111110011",
+        "100100000000000010000100000100000001",
+        "100111111111110010000000000100000001",
+        "100000000000000011111100000111000111",
+        "100111111111111111111100000100000001",
+        "100000000000000000000000000100000001",
+        "111111111111111111111111111111111111",   
+        ]
+        
+        const canvas = document.getElementById('overheadMap');
+        const context = canvas.getContext('2d');
+        const radius = 10;
+
+        var moveAmount = 5;
+        var padUp = false;
+        var padDown = false;
+        var padLeft = false;
+        var padRight = false;
+
+
+        const player = {x:440,y:425};
+
+        const canvasFp = document.getElementById('fpmap');
+        const cxFp = canvasFp.getContext("2d");
+        const blockSize = {x:cxFp.canvas.width/map1[0].length, y:cxFp.canvas.height/map1.length}
+        let walls = []
+
+        function render(ctx,cxFp){  
+
+            ctx.clearRect( 0, 0, ctx.canvas.width, ctx.canvas.height)
+            cxFp.clearRect( 0, 0, cxFp.canvas.width, cxFp.canvas.height)
+            
+            walls = [];
+            positionPlayer();
+            map1.forEach((row,col) =>{
+                for(var i=0;i<row.length;i++){
+                    if(row.charAt(i)== "1"){
+                        ctx.beginPath();
+                        ctx.strokeStyle = '#003300';
+                        ctx.rect(blockSize.x*i, blockSize.y*col, blockSize.x,  blockSize.y);
+                        ctx.stroke();
+
+
+                        // check if player colided with this box
+                        if( player.x +radius >blockSize.x*i && player.x - radius< (blockSize.x*i)+ blockSize.x 
+                        &&
+                            player.y + radius >blockSize.y*col && player.y- radius < (blockSize.y*col)+ blockSize.y 
+                        ){
+                            if(padLeft){
+                                player.x = player.x + moveAmount
+                            }
+                            if(padRight){
+                                player.x = player.x - moveAmount
+                            }
+                            if(padUp){
+                                player.y = player.y + moveAmount
+                            }
+                            if(padDown){
+                                player.y = player.y - moveAmount
+                            }
+                        }
+                    }
+                }
+            })
+
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#003300';
+            ctx.lineWidth = 5;
+            ctx.arc(player.x, player.y, radius, 0, 2 * Math.PI, false);
+            ctx.fill();
+            ctx.stroke();
+
+            // render the lines 
+            r =  500;
+
+           // ctx.beginPath();
+            ctx.lineWidth = 1;
+           
+            for(theta=3.1; theta<6.3; theta+=0.1) {
+                // get the linetwo target; see if it intersects with the nearest walls
+                walls.forEach(wall =>{
+
+                    // draw the walls that the player sees
+                    ctx.beginPath()
+
+                    ctx.moveTo(wall.x1, wall.y1);
+                    ctx.lineTo(wall.x2, wall.y2);
+                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = '#FF0000'
+                    ctx.stroke();
+
+
+                    intercetPoint = intersect(player.x, player.y, player.x + r * Math.cos(theta), player.y + r * Math.sin(theta), wall.x1, wall.y1, wall.x2, wall.y2) 
+                    if(intercetPoint){
+                        ctx.beginPath()
+                        ctx.moveTo(player.x, player.y);
+                        //check if this line will intercept a wall
+                        ctx.lineTo(intercetPoint.x, intercetPoint.y);
+                        ctx.stroke();
+                    }
+                })
+            }
+
+
+
+            // render the walls
+        
+
+        }
+        var interval = setInterval(function(){
+            render(context, cxFp)
+        },25)
+        function positionPlayer(){
+            if(padUp){
+                player.y = player.y - moveAmount
+            }
+            if(padDown){
+                player.y = player.y + moveAmount
+            }
+            if(padLeft){
+                player.x = player.x - moveAmount
+            }
+            if(padRight){
+                player.x = player.x + moveAmount
+            }
+        }
+        window.addEventListener("keydown", pressedKey);
+		function pressedKey() {
+			directionVar = event.key.replace("Arrow", "");
+			switch (directionVar) {
+				case "Up":
+                	padUp = true
+				break;
+				case "Down":
+                	padDown = true
+				break;
+                case "Left":
+                	padLeft = true
+				break;
+				case "Right":
+                	padRight = true
+				break;
+			}
+		}
+        window.addEventListener("keyup", pressedKeyUp);
+		function pressedKeyUp() {
+			directionVar = event.key.replace("Arrow", "");
+			switch (directionVar) {
+				case "Up":
+                    padUp = false
+				break;
+				case "Down":
+                    padDown = false
+				break;
+                case "Left":
+                	padLeft = false
+				break;
+				case "Right":
+                	padRight = false
+				break;
+                case " ":
+                    fAttached = false;
+                    fCooldown = 10
+                    break;
+			}
+		}
+        /*
+         const map1 =[
+        "111111111111111111111111111111111111",
+        "100100000000000011111100000000000001",
+        "100100111111111110000100000100111111",
+        "100100000000000010000100000100000001",
+        "100111111111110010000000000100000001",
+        "100100000000000011111100000100000001",
+        "100100111111111110000100000111110011",
+        "100100000000000010000100000100000001",
+        "100111111111110010000000000100000001",
+        "100000000000000011111100000111000111",
+        "100111111111111111111100000100000001",
+        "100000000000000000000000000100000001",
+        "111111111111111111111111111111111111",   
+        ]
+        */
+        // based on the player position return all the lines for the walls 
+
+
+        function intersect(x1, y1, x2, y2, x3, y3, x4, y4) {
+            // Check if none of the lines are of length 0
+            if ((x1 === x2 && y1 === y2) || (x3 === x4 && y3 === y4)) {
+                return false
+            }
+
+            denominator = ((y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1))
+
+            // Lines are parallel
+            if (denominator === 0) {
+                return false
+            }
+
+            let ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denominator
+            let ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denominator
+
+            // is the intersection along the segments
+            if (ua < 0 || ua > 1 || ub < 0 || ub > 1) {
+                return false
+            }
+
+            // Return a object with the x and y coordinates of the intersection
+            let x = x1 + ua * (x2 - x1)
+            let y = y1 + ua * (y2 - y1)
+
+            return {x, y}
+        }
+        </script>
+</body>
+</html>

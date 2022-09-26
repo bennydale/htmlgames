@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>3d game</title>
+</head>
+<style>
+	body {
+		margin: 0;
+		overflow: hidden;
+	}
+</style>
+
+
+<body>
+    <h1>3d game</h1>
+	<canvas id="raycastingCanvas" width="500" height="500" style="float:left;border:1px solid #000000"></canvas>
+    <canvas id="fpmap" width="500" height="500" style="float:left;border:1px solid #000000"></canvas>
+    <script>
+        const map1 =[
+        "111111111111111111111111111111111111",
+        "100100000000000011111100000000000001",
+        "100100111111111110000100000100111111",
+        "100100000000000010000100000100000001",
+        "100111111111110010000000000100000001",
+        "100100000000000011111100000100000001",
+        "100100111111111110000100000111110011",
+        "100100000000000010000100000100000001",
+        "100111111111110010000000000100000001",
+        "100000000000000011111100000111000111",
+        "100111111111111111111100000100000001",
+        "100000000000000000000000000100000001",
+        "111111111111111111111111111111111111",   
+        ]
+        var moveAmount = 2;
+        var padUp = false;
+        var padDown = false;
+        var padLeft = false;
+        var padRight = false;
+
+
+        let canvas = document.getElementById("raycastingCanvas");
+        let context = canvas.getContext("2d");
+
+        let canvas3d = document.getElementById("fpmap");
+        let cx3d = canvas3d.getContext("2d");
+
+       
+
+        let canvasWidth = canvas.width = 500;
+        let canvasHeight = canvas.height = 500;
+        let offsetX = canvas.offsetLeft;
+        let offsetY = canvas.offsetTop;
+
+        let player = {
+            x: 440,
+            y: 425
+        };
+        let badguy1 ={
+            x: 440,
+            y: 180,
+            width:20,
+            height:30,
+            img: new Image()
+        }
+        badguy1.img.src = 'badguy1.png'
+
+        let viewStartAngle = 270;
+        const viewAngle = 90
+
+        let wall3dRayWidth = canvas3d.width /viewAngle;
+
+
+
+        // helper functions
+        let degreeToRadian = function(degree) {
+            return (degree / 180) * Math.PI;
+        };
+
+        // vector object
+        let Vector = function(x, y) {
+            this.x = x;
+            this.y = y;
+        };
+
+        // static vector object methods
+        Vector.fromAngle = function(angle, v) {
+            if (v === undefined || v === null) {
+                v = new Vector();
+            }
+            v.x = Math.cos(angle);
+            v.y = Math.sin(angle);
+            return v;
+        };
+
+        Vector.dist = function(v1, v2) {
+            let dx = v1.x - v2.x,
+                dy = v1.y - v2.y;
+            return Math.sqrt(dx * dx + dy * dy);
+        };
+
+        // vector object instance methods
+        Vector.prototype.mag = function() {
+            let x = this.x,
+                y = this.y,
+                z = this.z;
+            return Math.sqrt(x * x + y * y + z * z);
+        };
+
+        Vector.prototype.div = function(v) {
+            if (typeof v === 'number') {
+                this.x /= v;
+                this.y /= v;
+                this.z /= v;
+            } else {
+                this.x /= v.x;
+                this.y /= v.y;
+                this.z /= v.z;
+            }
+        };
+
+        Vector.prototype.normalize = function() {
+            let m = this.mag();
+            if (m > 0) {
+                this.div(m);
+            }
+        };
+
+        // boundary object a: vector, b: vector
+        let Boundary = function(aVec, bVec,imgObj=null) {
+            this.a = aVec;
+            this.b = bVec;
+            this.imgObj = imgObj
+        };
+
+        Boundary.prototype.draw = function(ctx) {
+            ctx.beginPath();
+            ctx.moveTo(this.a.x, this.a.y);
+            ctx.lineTo(this.b.x, this.b.y);
+           
+            if( this.imgObj){
+                ctx.strokeStyle = "rgba(255, 0, 0, 1)";
+            } else {
+                ctx.strokeStyle = "rgba(0, 0, 0, 1)";
+            }
+            ctx.stroke();
+        };
+
+        // ray object
+        debugger
+        let Ray = function(pos, angle) {
+            this.pos = pos;
+            this.dir = Vector.fromAngle(angle);
+        };
+
+        /* test line used to show position a distribution of rays
+        Ray.prototype.draw = function(ctx) {
+        ctx.translate(this.pos.x, this.pos.y);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(this.dir.x * 10, this.dir.y * 10);
+        ctx.strokeStyle = "rgba(255, 255, 255, 1)";
+        ctx.stroke();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        }; */
+
+        Ray.prototype.cast = function(boundary) {
+            const x1 = boundary.a.x;
+            const y1 = boundary.a.y;
+            const x2 = boundary.b.x;
+            const y2 = boundary.b.y;
+
+            const x3 = this.pos.x;
+            const y3 = this.pos.y;
+            const x4 = this.pos.x + this.dir.x;
+            const y4 = this.pos.y + this.dir.y;
+
+            const den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+            // if denominator is zero then the ray and boundary are parallel
+            if (den === 0) {
+                return;
+            }
+
+            // numerator divided by denominator
+            let t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
+            let u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
+
+            if (t > 0 && t < 1 && u > 0) {
+                const pt = new Vector();
+                pt.x = x1 + t * (x2 - x1);
+                pt.y = y1 + t * (y2 - y1);
+                return pt;
+            } else {
+                return;
+            }
+        };
+
+        // particle object
+        let Particle = function(pos, divisor) {
+            this.pos = pos;
+          
+        };
+
+        Particle.prototype.update = function(x, y) {
+            this.pos.x = x;
+            this.pos.y = y;
+            this.rays = [];
+            this.divisor = 0.1; // the degree of approximation
+            for (let a = viewStartAngle-(viewAngle/2); a <viewStartAngle+(viewAngle/2); a += this.divisor) {
+                this.rays.push(new Ray(this.pos, degreeToRadian(a)));
+            }
+        };
+
+        Particle.prototype.look = function(ctx, walls) {
+            wall3dRayWidth = canvas3d.width/ this.rays.length
+            for (let i = 0; i < this.rays.length; i++) {
+
+                let pt;
+                let curretWall = null;
+                let closest = null;
+                let record = Infinity;
+
+                for (let j = 0; j < walls.length; j++) {
+
+                    pt = this.rays[i].cast(walls[j]);
+
+                    if (pt) {
+                        const dist = Vector.dist(this.pos, pt);
+                        if (dist < record && !walls[j].imgObj) {
+                            record = dist;
+                            closest = pt;
+                        }
+                        if (dist < record && walls[j].imgObj) {
+                            curretWall = walls[j];
+                            closestBg = pt
+                            distBg = dist;
+                        }
+                    }
+                }
+
+                let ch = canvas3d.height;
+                let dist= getDistance(this.pos.x, this.pos.y, closest.x, closest.y)
+                let height =canvas3d.height -(dist*1.5)
+                if (closest) {
+                    ctx.beginPath();
+                    ctx.moveTo(this.pos.x, this.pos.y);
+                    ctx.lineTo(closest.x, closest.y);
+                    ctx.strokeStyle = 'rgba(50, 80, 100, .4)';
+                    ctx.stroke();
+
+                    // draw wall in 3d
+                    if( height < 2 ){
+                        height = 2;
+                    }
+                    
+                    //height+= Math.abs((viewAngle/2)-i)
+                   
+                    cx3d.beginPath();
+                    cx3d.lineWidth = wall3dRayWidth+1
+                    // debugger;
+                    cx3d.moveTo( i*wall3dRayWidth, ch/2 - (height/2))
+                    cx3d.lineTo(i*(wall3dRayWidth),ch/2 + (height/2));
+                    cx3d.strokeStyle = 'rgba(50, 50, ' +( 0+(height/2))+', .5)';
+                    cx3d.stroke();
+                }
+
+                if(curretWall && curretWall.imgObj){
+                    let bgHeight = (canvas3d.height - distBg)/2
+                    let xCrop = closestBg.x - curretWall.a.x
+                    cx3d.drawImage(curretWall.imgObj.img,
+                        xCrop, 0, 2, curretWall.imgObj.height,
+                        i*wall3dRayWidth,  ch/2 - (bgHeight/4), 1, (bgHeight) 
+                    )
+                }
+            }
+        };
+
+        Particle.prototype.draw = function(ctx) {
+            ctx.beginPath();
+            ctx.arc(this.pos.x, this.pos.y, 5, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 1)';
+            ctx.stroke();
+            /* test line to show all rays
+            for (let i = 0; i < this.rays.length; i++) {
+                this.rays[i].draw(ctx);
+            }*/
+        };
+        function getDistance(x1, y1, x2, y2){
+            let y = x2 - x1;
+            let x = y2 - y1;
+            
+            return Math.sqrt(x * x + y * y);
+        }
+        // test code
+        let walls = [];
+        /*
+        let wall = new Boundary(new Vector(375, 250), new Vector(375, 50));
+        walls.push(wall);
+        let wall2 = new Boundary(new Vector(100, 100), new Vector(250, 250));
+        walls.push(wall2);
+        let wall3 = new Boundary(new Vector(50, 100), new Vector(250, 100));
+        walls.push(wall3);
+        let wall4 = new Boundary(new Vector(50, 50), new Vector(250, 50));
+        walls.push(wall4);
+        */
+        const radius = 5;
+        const blockSize = {x:context.canvas.width/map1[0].length, y:context.canvas.height/map1.length}
+   
+
+        map1.forEach((row,rowInx) =>{
+            let penStart = penStop = null;
+            for(i=0;i<row.length;i++){
+                if(row.charAt(i)==1 && penStart==null){
+                    penStart = i;
+                }
+                if( penStart !== null && row.charAt(i)==0){
+                    penStop = i;
+                }
+                // or at end .. just pend stop:
+                if( i==row.length-1){
+                    penStop = i;
+                }
+                if(penStart!=null && penStop!=null){
+                    walls.push(
+                        new Boundary(
+                            new Vector(penStart*blockSize.x, blockSize.y*rowInx),
+                            new Vector(penStop*blockSize.x, blockSize.y*rowInx )
+                        )
+                    )
+
+                    walls.push(
+                        new Boundary(
+                            new Vector(penStop*blockSize.x, blockSize.y*rowInx ),
+                            new Vector(penStop*blockSize.x, blockSize.y*rowInx + blockSize.y)
+                        )
+                    )
+                    walls.push(
+                        new Boundary(
+                            new Vector(penStop*blockSize.x, blockSize.y*rowInx + blockSize.y),
+                            new Vector(penStart*blockSize.x, blockSize.y*rowInx + blockSize.y)
+                        )
+                    )
+                    walls.push(
+                        new Boundary(
+                            new Vector(penStart*blockSize.x, blockSize.y*rowInx + blockSize.y),
+                            new Vector(penStart*blockSize.x, blockSize.y*rowInx )
+                        )
+                    )
+                    penStart = penStop = null;
+                }
+            }
+        });
+
+
+        let particle = new Particle(new Vector(200, 200), 1);
+
+        // main loop
+       
+        let main = function() {
+            positionPlayer();
+            context.clearRect(0, 0, canvasWidth, canvasHeight);
+            context.fillStyle = "white";
+            context.fillRect(0, 0, canvasWidth, canvasHeight);
+
+            cx3d.clearRect(0, 0, canvasWidth, canvasHeight);
+            cx3d.fillStyle = "white";
+            cx3d.fillRect(0, 0, canvasWidth, canvasHeight);            
+            // check for player collision: 
+            map1.forEach((row,col) =>{
+                for(var i=0;i<row.length;i++){
+                    if(row.charAt(i)== "1"){
+                        // check if player colided with this box
+                        if( player.x +radius >blockSize.x*i && player.x - radius< (blockSize.x*i)+ blockSize.x 
+                            &&
+                            player.y + radius >blockSize.y*col && player.y- radius < (blockSize.y*col)+ blockSize.y 
+                        ){
+                            alpah =degreeToRadian(viewStartAngle)
+                            if(padUp){
+                                player.y -= (moveAmount * Math.sin(alpah))
+                                player.x -= (moveAmount * Math.cos(alpah))
+                            }
+                            if(padDown){
+                                player.y += (moveAmount * Math.sin(alpah))
+                                player.x += (moveAmount * Math.cos(alpah))
+                            }
+                        }
+
+                        // check bad guy collided: 
+                        if( badguy1.x +badguy1.width >blockSize.x*i
+                            &&
+                            badguy1.y >blockSize.y*col
+                        ){
+                            badguy1.y -= 2
+                            badguy1.x -= 2
+                        }
+                        if(  badguy1.x - badguy1.width< (blockSize.x*i)+ blockSize.x 
+                            && 
+                            badguy1.y < (blockSize.y*col)+ blockSize.y 
+                        ){
+                            badguy1.y += 2
+                            badguy1.x += 2
+                        }
+                    }
+                }
+            })
+            // add the bad guys to the walls:
+            walls.push( new Boundary(
+                new Vector(badguy1.x, badguy1.y),
+                new Vector(badguy1.x+badguy1.width,badguy1.y),
+                badguy1
+            ))
+
+            for (let i = 0; i < walls.length; i++) {
+                walls[i].draw(context);
+            }
+
+            particle.update(player.x, player.y); // moves particle
+            particle.draw(context); // draws particle
+            particle.look(context, walls); // draws rays
+
+
+
+            window.requestAnimationFrame(main);
+        };
+        if( badguy1.img.complete ){
+            main();
+        } else{
+            badguy1.img.onload = () =>{
+                main();
+            }
+        }
+        interal = setInterval(() => {
+            badguy1.x+=Math.random()*5 - Math.random()*5
+            badguy1.y+=Math.random()*5 - Math.random()*5
+        }, 50);
+
+        function calculateXYBasedOnAngle(){
+
+        }
+        function positionPlayer(){
+            alpah =degreeToRadian(viewStartAngle)
+            if(padUp){
+                player.y += (moveAmount * Math.sin(alpah))
+                player.x += (moveAmount * Math.cos(alpah))
+            }
+            if(padDown){
+                player.y -= (moveAmount * Math.sin(alpah))
+                player.x -= (moveAmount * Math.cos(alpah))
+            }
+            if(padLeft){
+                viewStartAngle -= moveAmount
+            }
+            if(padRight){
+                viewStartAngle += moveAmount
+            }
+        }
+        window.addEventListener("keydown", pressedKey);
+		function pressedKey() {
+			directionVar = event.key.replace("Arrow", "");
+			switch (directionVar) {
+				case "Up":
+                	padUp = true
+				break;
+				case "Down":
+                	padDown = true
+				break;
+                case "Left":
+                	padLeft = true
+				break;
+				case "Right":
+                	padRight = true
+				break;
+			}
+		}
+        window.addEventListener("keyup", pressedKeyUp);
+		function pressedKeyUp() {
+			directionVar = event.key.replace("Arrow", "");
+			switch (directionVar) {
+				case "Up":
+                    padUp = false
+				break;
+				case "Down":
+                    padDown = false
+				break;
+                case "Left":
+                	padLeft = false
+				break;
+				case "Right":
+                	padRight = false
+				break;
+                case " ":
+                    fAttached = false;
+                    fCooldown = 10
+                    break;
+			}
+		}
+        </script>
+</body>
+</html>
