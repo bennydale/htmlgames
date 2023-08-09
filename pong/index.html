@@ -11,6 +11,10 @@
 		margin: 0;
 		overflow: hidden;
 	}
+	@font-face {
+		font-family: afont;
+		src: url(PressStart2P-Regular.ttf);
+	}
 </style>
 
 <body>
@@ -21,7 +25,7 @@
 		var moveA = 11
 		var PADDLE_2_XPOS = 980
 		var PADDLE_1_XPOS = 15
-		var PADDLE_HEIGHT = 50
+		var PADDLE_HEIGHT = 100
 		var BALL_HEIGHT =10
 		var hitsoundaffect = new Audio('hitsoundaffect.wav');
 		var losingsound = new Audio( 'losingnoise.wav')
@@ -38,7 +42,7 @@
 			y: 250
 		}
 
-
+		var curve = 1
 		var p1Up = false
 		var p1Down = false
 		var p2Up = false
@@ -88,8 +92,8 @@
 			context.fillRect (PADDLE_2_XPOS,paddle2,7, PADDLE_HEIGHT)
 
 
-			ball.x = ball.x + ballmovement.x
-			ball.y = ball.y + ballmovement.y
+			ball.x = ball.x + ballmovement.x// * (curve * (ball.y/200))
+			ball.y = ball.y + ballmovement.y// * (curve * (ball.y/10))
 
 			if (ball.y > 500-BALL_HEIGHT || ball.y < 0+BALL_HEIGHT){
 				ballmovement.y = ballmovement.y * -1
@@ -100,6 +104,7 @@
 			if (ball.x > PADDLE_2_XPOS){
 				if (ball.y > paddle2 && ball.y < paddle2 + PADDLE_HEIGHT ){
 					hitsoundaffect.play()
+					curve = Math.random()
 					ballmovement.x = ballmovement.x * -1.1
 				} else {
 					console.log(" player 1 wins")
@@ -112,6 +117,7 @@
 			if (ball.x < PADDLE_1_XPOS){
 				if (ball.y > paddle1 && ball.y < paddle1 + PADDLE_HEIGHT ){
 					hitsoundaffect.play()
+					curve = Math.random()
 					ballmovement.x = ballmovement.x * -1.1
 				} else {
 					console.log(" player 2 wins")
@@ -123,8 +129,10 @@
 			if (ballmovement.x > 9 ) {
 				ballmovement.x = 9
 			}
-			
-			context.font = '60px serif';
+			// load PressStart2P-Regular.ttf
+
+				
+			context.font = '60px afont';
 			context.fillText(player1score, 10, 50);
 			context.fillText(player2score, 950, 50);
 
@@ -150,7 +158,7 @@
                 	p2Down = true
 				break;
 
-				case "w":
+				case "w":					
 					p1Up = true
 				break;
 

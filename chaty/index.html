@@ -1,0 +1,88 @@
+<html>
+    <head>
+
+    </head>
+    <body>
+        <canvas id="ca"></canvas>
+    </body>
+    <script>
+        // Import necessary modules and dependencies
+        import Phaser from 'phaser';
+        import openai from 'openai';
+
+        // Set up the game configuration
+        const config = {
+            type: Phaser.AUTO,
+            width: 800,
+            height: 600,
+            scene: {
+                preload: preload,
+                create: create,
+                update: update,
+            },
+        };
+
+        // Initialize the game
+        const game = new Phaser.Game(config);
+
+        // Load assets in the preload function
+        function preload() {
+            // Load SVG graphics
+            this.load.svg('character', 'assets/character.svg');
+            this.load.svg('background', 'assets/background.svg');
+        }
+
+        // Set up the game in the create function
+        function create() {
+            // Set up the Chat GPT API
+            openai.apiKey = 'your_api_key_here';
+
+            // Display the SVG graphics
+            this.add.image(400, 300, 'background');
+            const character = this.add.image(400, 300, 'character');
+
+            // Set up user input and choices
+            this.input.on('pointerdown', () => {
+                // Determine the choice based on input
+                const choice = determineChoice();
+
+                // Query the Chat GPT API with the user's choice
+                queryGPT(choice).then((response) => {
+                    // Update the game state based on the response
+                    updateGameState(response);
+                });
+            });
+        }
+
+        // Update the game state in the update function
+        function update() {
+            // Any additional game state updates can go here
+        }
+
+        // Function to determine the choice based on user input
+        function determineChoice() {
+            // Your logic for determining the choice based on input goes here
+        }
+
+        // Function to query the Chat GPT API
+        async function queryGPT(choice) {
+            const response = await openai.Completion.create({
+                engine: 'text-davinci-002',
+                prompt: `What happens when the player chooses "${choice}"?`,
+                max_tokens: 50,
+                n: 1,
+                stop: null,
+                temperature: 0.7,
+            });
+
+            return response.choices[0].text;
+        }
+
+        // Function to update the game state based on the Chat GPT API response
+        function updateGameState(response) {
+            // Your logic for updating the game state based on the response goes here
+        }
+    </script>
+</html>
+
+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

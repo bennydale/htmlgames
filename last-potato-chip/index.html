@@ -1,0 +1,284 @@
+<html>
+<head>
+    <title>last-potato-chip</title>
+    <style>
+        body {
+            background-color: #000000;
+            color: #ffffff;
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            font-size: 16px;
+            line-height: 1.5;
+            margin: 0;
+            padding: 0;
+        }
+        h3 {
+            font-size: 1.5em;
+            font-weight: 400;
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+    <h3>The Last Potato Chip</h3> 
+    <canvas width="640" height="480" ></canvas>
+    <script>
+        var canvas = document.querySelector('canvas');
+        var ctx = canvas.getContext('2d');
+
+        var person = {
+            x: 0,
+            y: 380,
+            width: 40,
+            height: 100,
+            color: '#ff0000'
+        };
+        var controlCharcterPad = {
+            upPressed: false,
+            downPressed: false,
+            leftPressed: false,
+            rightPressed: false
+        }
+
+        // update controlCharcterPad when a key is pressed
+        document.addEventListener('keydown', function(event) {
+            if (event.keyCode == 38) {
+                controlCharcterPad.upPressed = true;
+            } else if (event.keyCode == 40) {
+                controlCharcterPad.downPressed = true;
+            } else if (event.keyCode == 37) {
+                controlCharcterPad.leftPressed = true;
+            } else if (event.keyCode == 39) {
+                controlCharcterPad.rightPressed = true;
+            }
+        });
+        // update controlCharcterPad when a key is released
+        document.addEventListener('keyup', function(event) {
+            if (event.keyCode == 38) {
+                controlCharcterPad.upPressed = false;
+            } else if (event.keyCode == 40) {
+                controlCharcterPad.downPressed = false;
+            } else if (event.keyCode == 37) {
+                controlCharcterPad.leftPressed = false;
+            } else if (event.keyCode == 39) {
+                controlCharcterPad.rightPressed = false;
+            }
+        });
+       
+        // play sawtooth wave with web audio api
+        function sawtooth() {
+            // create audio context
+            var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            // create oscillator
+            var oscillator = audioCtx.createOscillator();
+            // set oscillator type to sawtooth
+            oscillator.type = 'sawtooth';
+            // set oscillator frequency to 440 hz
+            oscillator.frequency.value = 440;
+            // connect oscillator to audio context
+            oscillator.connect(audioCtx.destination);
+            // start oscillator
+            oscillator.start();
+            // stop oscillator after 0.1 seconds
+            setTimeout(function() {
+                oscillator.stop();
+            }, 30);
+        }
+        
+        // create noise with web audio buffer ans play for 1 second
+        function noise() {
+            // create audio context
+            var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            // create audio buffer
+            var buffer = audioCtx.createBuffer(1, audioCtx.sampleRate, audioCtx.sampleRate);
+            // get audio buffer data
+            var data = buffer.getChannelData(0);
+            // fill audio buffer with random noise
+            for (var i = 0; i < audioCtx.sampleRate; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            // create audio buffer source
+            var source = audioCtx.createBufferSource();
+            // set audio buffer source buffer to audio buffer
+            source.buffer = buffer;
+            // connect audio buffer source to audio context
+            source.connect(audioCtx.destination);
+            // start audio buffer source
+            source.start();
+            // stop audio buffer source after 1 second
+            setTimeout(function() {
+                source.stop();
+            }, 250);
+        }
+
+        bullets = [];
+        // when spacebar is pressed, play sawtooth wave
+        document.addEventListener('keydown', function(event) {
+            if (event.keyCode == 32) {
+                // debounce calls to sawtooth()
+                if (typeof sawtoothTimeout == 'undefined') {
+                    sawtooth();
+                    sawtoothTimeout = setTimeout(function() {
+                        sawtoothTimeout = undefined;
+                    }, 50);
+                }
+                // fire bullet only if there are less than 10 bullets on the screen
+                if (bullets.length < 10) {
+                    bullets.push({
+                        x: person.x + person.width / 2,
+                        y: person.y,
+                        width: 10,
+                        height: 10,
+                        color: '#ff0000'
+                    });
+                }
+            }
+        });
+        birds = [];
+        let score = 0;
+
+        // main game loop
+        function loop() {
+            // clear the canvas
+            // make the canvas green
+            ctx.fillStyle = '#005500';
+            // draw a rectangle that fills the canvas
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // move the person if the controlCharcterPad is pressed
+            if (controlCharcterPad.leftPressed) {
+                person.x -= 5;
+                // don't allow the person to move off the left side of the canvas
+                if (person.x < 0) {
+                    person.x = 0;
+                }
+            }
+            if (controlCharcterPad.rightPressed) {
+                person.x += 5;
+                // don't allow the person to move off the right side of the canvas
+                if (person.x > canvas.width - person.width) {
+                    person.x = canvas.width - person.width;
+                }
+            }
+            // animate the bullets
+            for (var i = 0; i < bullets.length; i++) {
+                // move the bullet
+                bullets[i].y -= 10; 
+                // remove the bullet if it is off the top of the canvas
+                if (bullets[i].y < 0) {
+                    bullets.splice(i, 1);
+                    i--;
+                    continue;
+                }
+                // draw the bullet
+                ctx.fillStyle = bullets[i].color;
+                ctx.fillRect(bullets[i].x, bullets[i].y, bullets[i].width, bullets[i].height);
+            }
+            // randomly add birds
+            if (Math.random() < 0.02) {
+                birds.push({
+                    x: 0,
+                    y: Math.random()*100,
+                    width: 10,
+                    height: 10,
+                    animationFrame:0,
+                    dead: false
+                });
+            }
+
+            // animate the birds cross the canvas
+            for (var i = 0; i < birds.length; i++) {
+                let b = birds[i];
+                if (!b.dead) {
+                    dx = 10 * Math.random() -1;
+                    dy = 10 * Math.random() - 5;
+                } else{
+                    dx=0
+                    if (b.y < canvas.height-50) {
+                        dy=10
+                    }else{
+                        dy=0
+                    }
+                }
+                
+                
+                // move the bird
+                b.x += dx
+                // move the bird at a random angle
+                b.y += dy
+                // draw the brid from svg file
+                var img = new Image();
+                img.src = 'duck.sprite.png';
+                // draw the bird to the canvas with nearst neighbor scaling
+                ctx.imageSmoothingEnabled = false;
+
+        
+                //ctx.drawImage(img, birds[i].animationFrame*40, 0, 40, 40, birds[i].x, birds[i].y, birds[i].width, birds[i].height);
+                ctx.drawImage(img,  b.animationFrame*b.width,  0,  b.width,  10, b.x,  b.y,  50,  50);
+                // update animation frame 50% of the time
+                if(Math.random() < 0.25 && (b.y < canvas.height-50)) {
+                    b.animationFrame++;
+                }
+                if( b.dead ){
+                    if( b.animationFrame > 3){
+                        b.animationFrame = 2;
+                    }
+                } else{
+                    if( b.animationFrame > 1){
+                        b.animationFrame = 0;
+                    }
+                }
+            
+                // check for collisions with the bullets
+                for (var j = 0; j < bullets.length; j++) {
+                    if (b.x < bullets[j].x + bullets[j].width &&
+                        b.x + b.width > bullets[j].x &&
+                        b.y < bullets[j].y + bullets[j].height &&
+                        b.y + b.height > bullets[j].y) {
+                        // collision detected!
+                        // remove the bullet
+                        bullets.splice(j, 1);
+                        j--;
+                        // remove the bird
+                        //birds.splice(i, 1);
+                        //i--;
+                        b.dead = true;
+                        // play sawtooth wave
+                        noise();
+                        // increment score
+                        score++;
+                        // stop checking for collisions with this bird
+                        break;
+                    }
+                }
+                // draw score in upper left corner
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '20px Arial';
+                ctx.fillText('Score: ' + score, 10, 30);
+
+
+                // remove the bird if it is off the right side of the canvas
+                if (b.x > canvas.width) {
+                    birds.splice(i, 1);
+                    i--;
+                    continue;
+                }
+               
+            }
+
+
+            //ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // draw player_bb_gun.png
+            var img = new Image();
+            img.src = 'player_bb_gun.png';
+            // draw the immage to the canvas with nearst neighbor scaling
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(img, person.x, person.y, person.width, person.height);
+         
+        }
+        // call the loop every 30 milliseconds
+        setInterval(loop, 30);
+
+    </script>
+</body>
+</html>

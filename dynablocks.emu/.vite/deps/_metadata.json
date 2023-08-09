@@ -1,0 +1,23 @@
+{
+  "hash": "021b08c6",
+  "browserHash": "f0660cb8",
+  "optimized": {
+    "three": {
+      "src": "../../node_modules/three/build/three.module.js",
+      "file": "three.js",
+      "fileHash": "fc651774",
+      "needsInterop": false
+    },
+    "esbuild": {
+      "src": "../../node_modules/esbuild/lib/main.js",
+      "file": "esbuild.js",
+      "fileHash": "da316ef5",
+      "needsInterop": true
+    }
+  },
+  "chunks": {
+    "chunk-CQXHTUV2": {
+      "file": "chunk-CQXHTUV2.js"
+    }
+  }
+}
