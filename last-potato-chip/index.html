@@ -20,26 +20,39 @@
     </style>
 </head>
 <body>
-    <h3>The Last Potato Chip</h3> 
-    <canvas width="640" height="480" ></canvas>
+    <canvas width="400" height="400" ></canvas>
+
     <script>
+        var displayTitleScreen = true;
         var canvas = document.querySelector('canvas');
         var ctx = canvas.getContext('2d');
-
+        var timer = 30;
         var person = {
             x: 0,
-            y: 380,
+            y: 300,
             width: 40,
             height: 100,
             color: '#ff0000'
         };
+        var trippyMode = false;      
+
         var controlCharcterPad = {
             upPressed: false,
             downPressed: false,
             leftPressed: false,
             rightPressed: false
         }
+        // draw player_bb_gun.png
+        var imgPlayer = new Image();
+        imgPlayer.src = 'player_bb_gun.png';
 
+        var imgBird = new Image();
+        imgBird.src = 'duck.sprite.png';
+
+        var imgBackground = new Image();
+        imgBackground.src = 'back-ground-kill-ducks.png';
+
+        var playingAudio = false;
         // update controlCharcterPad when a key is pressed
         document.addEventListener('keydown', function(event) {
             if (event.keyCode == 38) {
@@ -67,6 +80,11 @@
        
         // play sawtooth wave with web audio api
         function sawtooth() {
+            if (playingAudio) {
+                return;
+            }
+            playingAudio = true;
+
             // create audio context
             var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             // create oscillator
@@ -82,11 +100,16 @@
             // stop oscillator after 0.1 seconds
             setTimeout(function() {
                 oscillator.stop();
+                playingAudio = false;
             }, 30);
         }
         
         // create noise with web audio buffer ans play for 1 second
         function noise() {
+            if (playingAudio) {
+                return;
+            }
+            playingAudio = true;
             // create audio context
             var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             // create audio buffer
@@ -108,20 +131,17 @@
             // stop audio buffer source after 1 second
             setTimeout(function() {
                 source.stop();
-            }, 250);
+                playingAudio = false;
+            }, 800);
         }
 
         bullets = [];
         // when spacebar is pressed, play sawtooth wave
         document.addEventListener('keydown', function(event) {
             if (event.keyCode == 32) {
-                // debounce calls to sawtooth()
-                if (typeof sawtoothTimeout == 'undefined') {
-                    sawtooth();
-                    sawtoothTimeout = setTimeout(function() {
-                        sawtoothTimeout = undefined;
-                    }, 50);
-                }
+                // debounce calls to sawtooth()                
+                sawtooth();
+
                 // fire bullet only if there are less than 10 bullets on the screen
                 if (bullets.length < 10) {
                     bullets.push({
@@ -136,15 +156,92 @@
         });
         birds = [];
         let score = 0;
-
+        let startTime = Date.now();
         // main game loop
         function loop() {
+            if (displayTitleScreen) {
+                // if trippy mode is on, make the canvas random colors
+                if (trippyMode) {
+                    ctx.fillStyle = '#' + Math.floor(Math.random()*16777215).toString(16);
+                } else {                    
+                    ctx.fillStyle = '#000000';
+                }                
+                console.log(ctx.fillStyle);
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                // draw title
+                ctx.fillStyle = 'red';
+                ctx.font = '30px Impact';
+                ctx.fillText('kill ducks', 100, 100);
+                ctx.font = '20px Impact';
+                ctx.fillStyle = 'white';
+                ctx.fillText('press spacebar to start, t for trippy mode', 40, 200);
+                ctx.font = '15px Impact';
+                ctx.fillText('kill as many ducks as you can in 60 seconds to anger peta', 40, 150);
+                // start game when spacebar is pressed
+                document.addEventListener('keydown', function(event) {                    
+                    // check for trippy mode
+                    if (event.keyCode == 84) {                        
+                        trippyMode = !trippyMode;
+                    }
+                    if (event.keyCode == 32 && displayTitleScreen) {
+                        displayTitleScreen = false;
+                        startTime = Date.now();
+                    }
+                }, {once: true});
+                return;
+            }
+            if (startTime + (timer*1000) < Date.now()) {
+                // clear the canvas
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                // draw title
+                ctx.fillStyle = 'red';
+                ctx.font = '30px Impact';
+                ctx.fillText('game over', 100, 100);
+                ctx.font = '20px Impact';
+                ctx.fillStyle = 'white';
+                ctx.fillText('score: ' + score, 100, 200);
+                ctx.font = '15px Impact';
+                ctx.fillText('press spacebar to restart', 100, 150);
+                // start game when spacebar is pressed after 2 seconds
+                setTimeout(function() {
+                    document.addEventListener('keydown', function(event) {
+                        if (event.keyCode == 32) {
+                            displayTitleScreen = true;
+                            timer = 30;
+                            score = 0;
+                            birds = [];
+                            bullets = [];
+                        }
+                    }, {once: true});
+                }, 2000);                
+                return;
+            }
+
+            
+
             // clear the canvas
             // make the canvas green
-            ctx.fillStyle = '#005500';
+            ctx.fillStyle = '#005500';                     
             // draw a rectangle that fills the canvas
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+            if (trippyMode == false) {
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                   // put back-ground-kill-ducks.png on the canvas
+                ctx.drawImage(imgBackground, 0, 0, 400, 400);
+            } else {
+                //draw random duck sprites
+            }
+            // draw the countdown timer
+            ctx.fillStyle = 'white';
+            ctx.font = '30px Impact';
+            ctx.fillText('Time: ' + Math.floor((startTime + (timer*1000) - Date.now())/1000), 250, 34);
+            ctx.fillStyle = 'black';
+            ctx.font = '30px Impact';
+            ctx.fillText('Time: ' + Math.floor((startTime + (timer*1000) - Date.now())/1000), 248, 32);
+            
+            
+                
+            
             // move the person if the controlCharcterPad is pressed
             if (controlCharcterPad.leftPressed) {
                 person.x -= 5;
@@ -206,15 +303,10 @@
                 b.x += dx
                 // move the bird at a random angle
                 b.y += dy
-                // draw the brid from svg file
-                var img = new Image();
-                img.src = 'duck.sprite.png';
                 // draw the bird to the canvas with nearst neighbor scaling
                 ctx.imageSmoothingEnabled = false;
-
-        
-                //ctx.drawImage(img, birds[i].animationFrame*40, 0, 40, 40, birds[i].x, birds[i].y, birds[i].width, birds[i].height);
-                ctx.drawImage(img,  b.animationFrame*b.width,  0,  b.width,  10, b.x,  b.y,  50,  50);
+                        
+                ctx.drawImage(imgBird,  b.animationFrame*b.width,  0,  b.width,  10, b.x,  b.y,  50,  50);
                 // update animation frame 50% of the time
                 if(Math.random() < 0.25 && (b.y < canvas.height-50)) {
                     b.animationFrame++;
@@ -239,23 +331,28 @@
                         // remove the bullet
                         bullets.splice(j, 1);
                         j--;
+                        // increment score
+                        if (b.dead == false) {
+                            score++;
+                        }
                         // remove the bird
                         //birds.splice(i, 1);
                         //i--;
                         b.dead = true;
                         // play sawtooth wave
                         noise();
-                        // increment score
-                        score++;
                         // stop checking for collisions with this bird
                         break;
                     }
                 }
                 // draw score in upper left corner
-                ctx.fillStyle = '#ffffff';
-                ctx.font = '20px Arial';
+                
+                ctx.fillStyle = 'white';
+                ctx.font = '30px Impact';
+                ctx.fillText('Score: ' + score, 12, 34);
+                ctx.fillStyle = 'black';
+                ctx.font = '30px Impact';
                 ctx.fillText('Score: ' + score, 10, 30);
-
 
                 // remove the bird if it is off the right side of the canvas
                 if (b.x > canvas.width) {
@@ -267,13 +364,10 @@
             }
 
 
-            //ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // draw player_bb_gun.png
-            var img = new Image();
-            img.src = 'player_bb_gun.png';
+            
             // draw the immage to the canvas with nearst neighbor scaling
             ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(img, person.x, person.y, person.width, person.height);
+            ctx.drawImage(imgPlayer, person.x, person.y, person.width, person.height);
          
         }
         // call the loop every 30 milliseconds
