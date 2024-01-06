@@ -1,0 +1,146 @@
+<img id="officeImage" src="ff0.jpg" style="display: none;">
+<img id="officeImage1" src="ff1.jpg" style="display: none;">
+<img id="officeImage2" src="ff2.jpg" style="display: none;">
+<canvas id="canvas" width="800" height="600" style="position:absolute;left:0px;top:0px;"></canvas>
+<audio id="backgroundMusic" loop>
+    <source src="spooky_scarry_music.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+  </audio>
+
+<script>
+var canvas = document.getElementById("canvas");
+var ctx = canvas.getContext("2d");
+var officeImage = document.getElementById("officeImage");
+var officeImage1 = document.getElementById("officeImage1");
+var officeImage2 = document.getElementById("officeImage2");
+var camera_x = 0;
+var cameraSpeed = 0; // Speed of the camera movement
+var movingDirection = 0; // -1 for left, 1 for right, 0 for stationary
+var mousePos
+
+// Function to get the mouse position relative to the canvas
+function getMousePos(canvas, evt) {
+    var rect = canvas.getBoundingClientRect();
+    return {
+        x: evt.clientX - rect.left,
+        y: evt.clientY - rect.top
+    };
+}
+// Listen for mouse movement events on the canvas
+canvas.addEventListener('mousemove', function(evt) {
+    mousePos = getMousePos(canvas, evt);
+    // If the mouse is on the left side of the canvas, set the direction to left
+    if(mousePos.x < canvas.width / 2) {
+        movingDirection = -1;
+    }
+    // If the mouse is on the right side of the canvas, set the direction to right
+    else if(mousePos.x > canvas.width / 2) {
+        movingDirection = 1;
+    }
+}, false);
+
+canvas.addEventListener('mouseout', function(evt) {
+    movingDirection = 0;
+}, false);
+var flashlight = false;
+// when the space bar is pressed set flashlight to true
+document.addEventListener('keydown', function(event) {
+    if(event.keyCode == 32) {
+        flashlight = true;
+    }
+});
+// when the space bar is released set flashlight to false
+document.addEventListener('keyup', function(event) {
+    if(event.keyCode == 32) {
+        flashlight = false;
+    }
+});
+let ffInx = 0;
+
+var flightImg = new Image();
+var matImg = new Image();
+var transprentoffice = new Image();
+transprentoffice.src = 'ff-transparent-doors.png'; // Make sure this path is correct
+flightImg.src = 'fflight.png'; // Make sure this path is correct
+matImg.src = 'mat.png'; // Make sure this path is correct
+// Draw the image cropped to the canvas
+function updateCamera() {
+    var scale = Math.max(canvas.width / officeImage.width, canvas.height / officeImage.height);
+    var scaledWidth = officeImage.width * scale;
+    var scaledHeight = officeImage.height * scale;
+    
+    // Calculate the max x-coordinate for the camera
+    var maxCameraX = scaledWidth - canvas.width;
+
+    // Update the camera speed and direction
+    cameraSpeed = 7 * movingDirection;
+    camera_x += cameraSpeed;
+    
+    // Constrain the camera_x to stay within bounds
+    camera_x = Math.max(0, Math.min(camera_x, maxCameraX));
+
+    // Clear the canvas and draw the scaled background images at the new camera position
+    ctx.clearRect(0, 0, canvas.width, canvas.height);    
+    let currentOfficeImage = officeImage;
+    switch (true) {    
+        case ffInx < 5:
+            currentOfficeImage = officeImage;            
+            break;
+        case ffInx < 10:
+            currentOfficeImage = officeImage1;
+            break;
+        case ffInx < 15:
+            currentOfficeImage = officeImage2;
+            break;
+    }
+    ffInx++;
+    if (ffInx > 14) {
+        ffInx = 0;
+    }
+    // if the space bar is pressed
+    if(flashlight) {
+        // draw ffflight.png        
+        ctx.drawImage(flightImg, -camera_x, 0, scaledWidth, scaledHeight);
+        // fade to black where 100 pxiels from the the mouse position
+        var gradient = ctx.createRadialGradient(mousePos.x, mousePos.y, 0, mousePos.x, mousePos.y, 150);
+        gradient.addColorStop(0, "rgba(0,0,0,0)");
+        gradient.addColorStop(1, "rgba(0,0,0,1)");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);            
+        // draw transprentoffice transprent ontop:
+        ctx.drawImage(transprentoffice, -camera_x, 0, scaledWidth, scaledHeight);        
+    } else {
+        // draw the office image
+        ctx.drawImage(currentOfficeImage, -camera_x, 0, scaledWidth, scaledHeight);        
+    }
+
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    updateCamera();    
+    let random = Math.floor(Math.random()*60)
+    if (random == 20) {
+        document.getElementById("backgroundMusic").play();
+    }
+}
+// make sure all the office images are loaded:
+officeImage.onload = function() {    
+    // add a button
+    var button = document.createElement("button");
+    button.innerHTML = "Start the game!";
+    button.style.position = "absolute";
+    button.style.left = "50%";
+    button.style.top = "50%";
+    button.style.transform = "translate(-50%, -50%)";
+    button.onclick = function() {
+        // hide the button
+        button.style.display = "none";
+        document.getElementById("backgroundMusic").play();
+        document.getElementById("backgroundMusic").pause();        
+        animate();
+    };
+    document.body.appendChild(button);
+};
+
+</script>

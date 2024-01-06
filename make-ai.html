@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Simulation Menu</title>
+<style>
+  #gameCanvas {
+    border: 1px solid #000000;
+  }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas" width="400" height="400"></canvas>
+
+<script>
+var canvas = document.getElementById('gameCanvas');
+var ctx = canvas.getContext('2d');
+var gridSize = 18; // Adjusted grid size for prompt space
+var gridRows = Math.floor((canvas.height - 60) / gridSize);
+var gridCols = Math.floor(canvas.width / gridSize);
+var gridData = Array(gridRows).fill().map(() => Array(gridCols).fill(false));
+var screenname = "home";
+var collectionOfGrids = [];
+
+function trainAI(input) {
+    // get the collection of grids from local storage else empty array
+    var collectionOfGrids = JSON.parse(localStorage.getItem("gridData")) || [];
+    // add the current grid and name to the collection
+    collectionOfGrids.push({name: input, grid: gridData});
+    // if more than 9 grids remove until 9:
+    while (collectionOfGrids.length > 90) {
+        collectionOfGrids.shift();
+    }
+    // store the collection back to local storage    
+    localStorage.setItem("gridData", JSON.stringify(collectionOfGrids));    
+}
+function drawMenu() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000';
+    ctx.font = '24px Impact';
+    ctx.textAlign = 'center';
+    ctx.fillText("Make Your Own AI Sim", canvas.width / 2, 40);
+    drawButton("New AI", 100, 340, 200, 40);
+}
+var miniGridsPerRow = 3;
+var miniGridsPerCol = 2;
+let start = 0;
+let end = start + miniGridsPerRow*miniGridsPerCol
+function drawSeeImages() {
+    clearbuttons();
+    var collectionOfGrids = JSON.parse(localStorage.getItem("gridData")) || [];
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000';
+    ctx.textAlign = 'center';
+    ctx.fillText("See Images", canvas.width / 2, 40);
+    // add back button on the upper left corner
+    var button = document.createElement("button");
+    button.setAttribute("type", "button");
+    button.setAttribute("id", "back");
+    button.setAttribute("name", "back");
+    button.setAttribute("value", "Back");
+    button.setAttribute("style", "width: 100px; height: 30px; font-size: 16px; margin-top: 10px; position: absolute; left: 25px; top: 10px;");
+    button.innerHTML = "Back";
+    document.body.appendChild(button);
+    // add a click binding
+    button.addEventListener ("click", function() {
+        screenname = "drawhub";
+        drawhub();
+    });
+    
+
+ 
+    var miniGridWidth = canvas.width / miniGridsPerRow;
+    var miniGridHeight = (canvas.height - 90) / miniGridsPerCol;    
+    // Set the font for the mini grid names
+    var nameFontSize = 14;
+    ctx.font = nameFontSize + 'px Arial';
+   
+    // add next and previous buttons
+    var button = document.createElement("button");
+    button.setAttribute("type", "button");
+    button.setAttribute("id", "next");
+    button.setAttribute("name", "next");
+    button.setAttribute("value", "Next");
+    button.setAttribute("style", "width: 100px; height: 30px; font-size: 16px; margin-top: 10px; position: absolute; left: 275px; top: 355px;");
+    button.innerHTML = "Next";
+    document.body.appendChild(button);
+    // add a click binding
+    button.addEventListener ("click", function() {
+        start += miniGridsPerRow*miniGridsPerCol;
+        end = start + miniGridsPerRow*miniGridsPerCol;
+        if (end > collectionOfGrids.length) {
+            start = 0;
+            end = start + miniGridsPerRow*miniGridsPerCol;
+        }
+        drawSeeImages();
+    });
+    // add previous button
+    var button = document.createElement("button");
+    button.setAttribute("type", "button");
+    button.setAttribute("id", "previous");
+    button.setAttribute("name", "previous");
+    button.setAttribute("value", "Previous");
+    button.setAttribute("style", "width: 100px; height: 30px; font-size: 16px; margin-top: 10px; position: absolute; left: 25px; top: 355px;");
+    button.innerHTML = "Previous";
+    document.body.appendChild(button);
+    // add a click binding
+    button.addEventListener ("click", function() {
+        start -= miniGridsPerRow*miniGridsPerCol;
+        end = start + miniGridsPerRow*miniGridsPerCol;
+        if (start < 0) {
+            start = collectionOfGrids.length - miniGridsPerRow*miniGridsPerCol;
+            end = start + miniGridsPerRow*miniGridsPerCol;
+        }
+        drawSeeImages();
+    });
+    collectionOfGrids.forEach(function(item, index) {
+        if (index < start || index >= end) {
+            return;
+        }
+        // make index start at 0
+        index -= start;
+        var row = Math.floor(index / miniGridsPerRow);
+        var col = index % miniGridsPerRow;
+        var startX = col * miniGridWidth;
+        var startY = 50 + row * miniGridHeight;
+
+        // Include the name in the startY calculation to ensure it's drawn above each mini grid
+        startY += nameFontSize 
+
+        // Draw the name above the grid
+        console.log(item.name, startX + miniGridWidth / 2, startY);
+        ctx.fillStyle = '#000';
+        ctx.fillText(item.name, startX + miniGridWidth / 2, startY);
+
+        // Draw the mini grid
+        var scaleFactorX = miniGridWidth / gridCols;
+        var scaleFactorY = (miniGridHeight - nameFontSize) / gridRows;
+        
+        // Adjust the startY to start drawing the grid below the name
+        startY += 5; // Extra padding below the name
+        
+        item.grid.forEach(function(rowData, rowIndex) {
+            rowData.forEach(function(cell, colIndex) {
+                ctx.fillStyle = cell ? 'black' : 'white';
+                ctx.fillRect(
+                    startX + colIndex * scaleFactorX, 
+                    startY + rowIndex * scaleFactorY, 
+                    scaleFactorX, 
+                    scaleFactorY
+                );
+                ctx.strokeStyle = '#ddd';
+                ctx.strokeRect(
+                    startX + colIndex * scaleFactorX, 
+                    startY + rowIndex * scaleFactorY, 
+                    scaleFactorX, 
+                    scaleFactorY
+                );
+            });
+        });
+    });
+}
+function similarity(s1, s2) {
+  var longer = s1;
+  var shorter = s2;
+  if (s1.length < s2.length) {
+    longer = s2;
+    shorter = s1;
+  }
+  var longerLength = longer.length;
+  if (longerLength == 0) {
+    return 1.0;
+  }
+  return (longerLength - editDistance(longer, shorter)) / parseFloat(longerLength);
+}
+function editDistance(s1, s2) {
+  s1 = s1.toLowerCase();
+  s2 = s2.toLowerCase();
+
+  var costs = new Array();
+  for (var i = 0; i <= s1.length; i++) {
+    var lastValue = i;
+    for (var j = 0; j <= s2.length; j++) {
+      if (i == 0)
+        costs[j] = j;
+      else {
+        if (j > 0) {
+          var newValue = costs[j - 1];
+          if (s1.charAt(i - 1) != s2.charAt(j - 1))
+            newValue = Math.min(Math.min(newValue, lastValue),
+              costs[j]) + 1;
+          costs[j - 1] = lastValue;
+          lastValue = newValue;
+        }
+      }
+    }
+    if (i > 0)
+      costs[s2.length] = lastValue;
+  }
+  return costs[s2.length];
+}
+
+var interval;
+async function generateImage (){
+    // get the collection of grids from local storage else empty array
+    var collectionOfGrids = JSON.parse(localStorage.getItem("gridData")) || [];
+    // add the current grid and name to the collection
+    // if more than 90 grids remove until 9:
+    while (collectionOfGrids.length > 90) {
+        collectionOfGrids.shift();
+    }
+    // store the collection back to local storage    
+    localStorage.setItem("gridData", JSON.stringify(collectionOfGrids));
+
+    // generate a random grid data
+    var noise = "";
+    for (var i = 0; i < gridRows; i++) {
+        for (var j = 0; j < gridCols; j++) {
+            noise += Math.random() > 0.5 ? "#" : ".";
+        }
+        noise += "\n";
+    }
+    // fill the grid with the noise
+    for (var i = 0; i < gridRows; i++) {
+        for (var j = 0; j < gridCols; j++) {
+            gridData[i][j] = noise[i * gridCols + j] == "#";
+        }
+    }
+    // draw the grid
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000';
+    ctx.font = '24px Impact';
+    ctx.textAlign = 'center';
+    drawGrid();
+    inputTxt = document.getElementById("input").value;
+    // go through all the names and see which name is closet to input and use that grid:
+    var highest = 0;
+    var highestName = "";
+    if(collectionOfGrids.length == 0) {
+        alert("Please train the AI first");
+        return;
+    }
+    for (var i = 0; i < collectionOfGrids.length; i++) {
+        var name = collectionOfGrids[i].name;
+        if(similarity(name, inputTxt) > highest && Math.random() > 0.5) {
+            highest = similarity(name, inputTxt);
+            highestName = name;
+            randomGrid = collectionOfGrids[i].grid;
+        }
+    }
+    console.log('using :', highestName)
+    // fetch localhos:3000/getAsciImage 
+    const sampleAsciImage = randomGrid.map(row => row.map(cell => cell ? '#' : '.').join('')).join('\n');
+    
+    var gridResponse = false
+    fetch('http://localhost:3000/getAsciImage', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            sampleImageName: highestName,
+            sampleImage: sampleAsciImage,
+            imagePromt: inputTxt
+        })
+    })
+    .then(res => res.json())
+    .then(data => {                
+        let msg = data.choices[0].message.content
+        console.log('got response', data, msg)
+        // strip '```\n' from the response start if present:
+        if( msg.indexOf('```\n') !== -1 ) {
+            msg = msg.split('```\n')[1]
+            // split off end if present:
+            msg = msg.split('```')[0]
+        }
+        // update the gridResponse        
+        msg.split('\n').forEach((row, rowIndex) => {
+            row.split('').forEach((cell, colIndex) => {
+                if (!gridResponse) {
+                    gridResponse = []
+                }
+                if (!gridResponse[rowIndex]) {
+                    gridResponse[rowIndex] = []
+                }
+                gridResponse[rowIndex][colIndex] = cell == '#';
+            })
+        })   
+    })
+
+    var foundPixle = [];
+    // set Generate & input to hidden:
+    var button = document.getElementById("generate");
+    button.setAttribute("style", "display: none;");
+    var input = document.getElementById("input");
+    input.setAttribute("style", "display: none;");
+    // draw proccessing div
+    var div = document.createElement("div");
+    div.setAttribute("id", "processing");
+    div.setAttribute("style", "width: 200px; height: 30px; font-size: 16px; margin-top: 10px; position: absolute; left: 50px; top: 355px; text-align: center;");
+    div.innerHTML = "Processing...";
+    document.body.appendChild(div);    
+    
+
+    internavl = setInterval(()=> {    
+        console.log('drawing')
+        for (var i = 0; i < gridRows; i++) {
+            for (var j = 0; j < gridCols; j++) {
+                // skip if the pixel is already found
+                if (foundPixle[i] && foundPixle[i][j]) {
+                    continue;
+                }
+                // randomly chouse black or white:
+                ctx.fillStyle = Math.random() > 0.5 ? 'black' : 'white';
+                ctx.fillRect(j * gridSize, i * gridSize, gridSize, gridSize);
+                ctx.strokeStyle = '#ddd';
+                ctx.strokeRect(j * gridSize, i * gridSize, gridSize, gridSize);
+
+                // check if the pixel is black & 1/2 chance to draw it correctly
+                if (gridResponse && Math.random() > 0.9 ) {
+                    ctx.fillStyle = gridResponse[i][j] ? 'black' : 'white';
+                    ctx.fillRect(j * gridSize, i * gridSize, gridSize, gridSize);
+                    ctx.strokeStyle = '#ddd';
+                    ctx.strokeRect(j * gridSize, i * gridSize, gridSize, gridSize);
+                    // mark the pixel as found  
+                    if (!foundPixle[i]) {
+                        foundPixle[i] = [];
+                    }
+                    console.log('found pixel', i, j)
+                    foundPixle[i][j] = true;                                  
+                }
+                // 1/1000 chance to find the pixel
+                if (Math.random() < 0.00005) {
+                    // mark the pixel as found  
+                    if (!foundPixle[i]) {
+                        foundPixle[i] = [];
+                    }
+                    foundPixle[i][j] = true; 
+                }               
+            }
+        }       
+        // check if all the pixels are found
+        var allFound = true;
+        for (var i = 0; i < gridRows; i++) {
+            for (var j = 0; j < gridCols; j++) {
+                if (!foundPixle[i] || !foundPixle[i][j]) {
+                    allFound = false;
+                }
+            }
+        }         
+        if (allFound) {
+            clearInterval(internavl);
+            // hide processing div
+            var div = document.getElementById("processing");
+            div.parentNode.removeChild(div);
+            // restore the generate button
+            var button = document.getElementById("generate");
+            button.setAttribute("style", "width: 100px; height: 30px; font-size: 16px; margin-top: 10px; position: absolute; left: 275px; top: 355px;");                        
+            // restore the input box
+            var input = document.getElementById("input");
+            input.setAttribute("style", "width: 200px; height: 30px; font-size: 16px; margin-top: 10px; position: absolute; left: 50px; top: 355px; text-align: center;");            
+        }    
+    }, 30);
+   
+    // chouse one of the grids from the collection
+    
+    for (var i = 0; i < gridRows; i++) {
+        for (var j = 0; j < gridCols; j++) {
+            ctx.fillStyle = randomGrid[i][j] ? 'black' : 'white';
+            ctx.fillRect(j * gridSize, i * gridSize, gridSize, gridSize);
+            ctx.strokeStyle = '#ddd';
+            ctx.strokeRect(j * gridSize, i * gridSize, gridSize, gridSize);
+        }
+    }
+
+    /*// get the input
+    var input = document.getElementById("input").value;
+    // generate the image
+    var output = net.run(character(noise));
+    console.log(output);
+    // get the name of the highest output
+    var highest = 0;
+    var highestName = "";
+    for (var key in output) {
+        if (output[key] > highest) {
+            highest = output[key];
+            highestName = key;
+        }
+    }
+    console.log(highestName);*/
+}
+
+function testAI() {
+    clearbuttons();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000';
+    ctx.font = '15px Impact';
+    ctx.textAlign = 'center';
+    ctx.fillText("Type in what you want the ai to generate", canvas.width / 1.6, 30);
+    // add back button on the upper left corner
+    var button = document.createElement("button");
+    button.setAttribute("type", "button");
+    button.setAttribute("id", "back");
+    button.setAttribute("name", "back");
+    button.setAttribute("value", "Back");
+    button.setAttribute("style", "width: 100px; height: 30px; font-size: 16px; margin-top: 10px; position: absolute; left: 25px; top: 10px;");
+    button.innerHTML = "Back";
+    document.body.appendChild(button);
+    // add a click binding
+    button.addEventListener ("click", function() {
+        clearInterval(internavl);
+        screenname = "drawhub";
+        drawhub();
+    });
+    // add a input box at the bottom center
+    var input = document.createElement("input");
+    input.setAttribute("type", "text");
+    input.setAttribute("id", "input");
+    input.setAttribute("name", "input");
+    input.setAttribute("value", "");
+    input.setAttribute("placeholder", "Type here");
+    input.setAttribute("style", "width: 200px; height: 30px; font-size: 16px; margin-top: 10px; position: absolute; left: 50px; top: 355px; text-align: center;");
+    document.body.appendChild(input);
+    // add a generate button at te lower right corner
+    var button = document.createElement("button");
+    button.setAttribute("type", "button");
+    button.setAttribute("id", "generate");
+    button.setAttribute("name", "generate");
+    button.setAttribute("value", "Generate");
+    button.setAttribute("style", "width: 100px; height: 30px; font-size: 16px; margin-top: 10px; position: absolute; left: 275px; top: 355px;");
+    button.innerHTML = "Generate";
+    document.body.appendChild(button);
+    // add a click binding
+    button.addEventListener ("click", function() {
+        var input = document.getElementById("input").value;
+        // check if the input is empty
+        if (input == "") {
+            alert("Please type something in the input box");
+        } else {
+            // generate the image
+            generateImage(input);
+        }
+        
+    });
+
+}
+
+function drawhub() {
+    clearbuttons();
+    // clear the canvas
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000';
+    ctx.font = '24px Impact';
+    ctx.textAlign = 'center';
+    ctx.fillText("AI Simulation Hub", canvas.width / 2, 40);
+    // draw a html button
+    // create a html button
+    var button = document.createElement("button");
+    button.setAttribute("type", "button");
+    button.setAttribute("id", "see");
+    button.setAttribute("name", "see");
+    button.setAttribute("value", "See");
+    button.setAttribute("style", "width: 130px; height: 30px; font-size: 16px; margin-top: 10px; position: absolute; left: 25px; top: 355px;");
+    button.innerHTML = "See Images";
+    document.body.appendChild(button);
+    // bind on click event to the button
+    button.addEventListener ("click", function() {
+        drawSeeImages();
+    });
+    // create a html button
+    var button = document.createElement("button");
+    button.setAttribute("type", "button");
+    button.setAttribute("id", "test");
+    button.setAttribute("name", "test");
+    button.setAttribute("value", "Test");
+    button.setAttribute("style", "width: 130px; height: 30px; font-size: 16px; margin-top: 10px; position: absolute; left: 165px; top: 355px;");
+    button.innerHTML = "Test AI";
+    document.body.appendChild(button);
+    // create two html buttons at the upper right corner with one saying "new image" and the other saying "view neural network"
+    // bind on click event to the button
+    button.addEventListener ("click", function() {
+        testAI();
+    });
+    var button = document.createElement("button")
+    button.setAttribute("type", "button");
+    button.setAttribute("id", "newimg");
+    button.setAttribute("name", "newimg");
+    button.setAttribute("value", "Newimg");
+    button.setAttribute("style", "width: 130px; height: 30px; font-size: 16px; margin-top: 10px; position: absolute; left: 25px; top: 45px;");
+    button.innerHTML = "New Image";
+    document.body.appendChild(button);
+    // click binding for new image button
+    button.addEventListener ("click", function() {
+        screenname = "edit-grid";
+        // clear all the buttons
+        clearbuttons();
+        // clear the canvas
+        newAI();
+    });
+    // create a html button
+    var button = document.createElement("button");
+    button.setAttribute("type", "button");
+    button.setAttribute("id", "view");
+    button.setAttribute("name", "view");
+    button.setAttribute("value", "View");
+    button.setAttribute("style", "width: 170px; height: 30px; font-size: 16px; margin-top: 10px; position: absolute; left: 165px; top: 45px;");
+    button.innerHTML = "View Neural Network";
+    document.body.appendChild(button);
+  
+}
+function clearbuttons() {
+    var button = document.getElementById("newimg");
+    if (button) {
+        button.parentNode.removeChild(button);
+    }    
+    var button = document.getElementById("view");
+    if (button) {
+        button.parentNode.removeChild(button);
+    }    
+    var button = document.getElementById("test");
+    if (button) {
+        button.parentNode.removeChild(button);
+    }
+    var button = document.getElementById("see");
+    if (button) {
+        button.parentNode.removeChild(button);
+    }
+      // GET RID OF THE INPUT BOX AND BUTTON
+      var input = document.getElementById("input");
+      if (input) {
+          input.parentNode.removeChild(input);
+      }
+      
+    
+    var button = document.getElementById("next");
+    if (button) {
+        button.parentNode.removeChild(button);
+    }
+    var button = document.getElementById("back");
+    if (button) {
+        button.parentNode.removeChild(button);
+    }
+    var button = document.getElementById("generate");
+    if (button) {
+        button.parentNode.removeChild(button);
+    }
+    var button = document.getElementById("previous");
+    if (button) {
+        button.parentNode.removeChild(button);
+    }
+}
+function drawButton(text, x, y, w, h) {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = '#000';
+    ctx.font = '16px Impact';
+    ctx.fillText(text, x + w / 2, y + h / 2 + 6);
+}
+
+function drawGrid() {
+    for (var i = 0; i < gridCols * gridSize; i += gridSize) {
+        for (var j = 0; j < gridRows * gridSize; j += gridSize) {
+            ctx.strokeStyle = '#ddd';
+            ctx.strokeRect(i, j, gridSize, gridSize);
+        }
+    }
+}
+
+function drawPrompt() {
+    ctx.fillStyle = '#000';
+    ctx.font = '16px Impact';
+    ctx.fillText("Draw something and type what it is:", canvas.width / 2, canvas.height - 50);
+    // add a input box
+    var input = document.createElement("input");
+    input.setAttribute("type", "text");
+    input.setAttribute("id", "input");
+    input.setAttribute("name", "input");
+    input.setAttribute("value", "");
+    input.setAttribute("placeholder", "Type here");
+    input.setAttribute("style", "width: 200px; height: 30px; font-size: 16px; margin-top: 10px; position: absolute; left: 25px; top: 355px;");
+    document.body.appendChild(input);
+    // add a next button
+    var button = document.createElement("button");
+    button.setAttribute("type", "button");
+    button.setAttribute("id", "next");
+    button.setAttribute("name", "next");
+    button.setAttribute("value", "Next");
+    button.setAttribute("style", "width: 100px; height: 30px; font-size: 16px; margin-top: 10px; position: absolute; left: 275px; top: 355px;");
+    button.innerHTML = "Next";
+    document.body.appendChild(button);
+    // add a click binding
+    button.addEventListener ("click", function() {
+        var input = document.getElementById("input").value;
+        // check if the grid has something on it
+        if (isGridEmpty()) {
+            alert("Please draw something on the grid");
+        } else if (input == "") {
+            alert("Please type something in the input box");
+        } else {
+            // train the AI
+            trainAI(input);
+            screenname = "drawhub";
+            drawhub();
+        }
+        
+    });
+}
+function isGridEmpty() {
+    for (var i = 0; i < gridCols; i++) {
+        for (var j = 0; j < gridRows; j++) {
+            if (gridData[j][i]) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+function toggleFill(x, y) {
+    var gridX = Math.floor(x / gridSize);
+    var gridY = Math.floor(y / gridSize);
+    if (gridX >= 0 && gridX < gridCols && gridY >= 0 && gridY < gridRows) {
+        gridData[gridY][gridX] = !gridData[gridY][gridX];
+        ctx.fillStyle = gridData[gridY][gridX] ? 'black' : 'white';
+        ctx.fillRect(gridX * gridSize, gridY * gridSize, gridSize, gridSize);
+        ctx.strokeStyle = '#ddd';
+        ctx.strokeRect(gridX * gridSize, gridY * gridSize, gridSize, gridSize);
+    }
+}
+function fill(x, y){
+    var gridX = Math.floor(x / gridSize);
+    var gridY = Math.floor(y / gridSize);
+    if (gridX >= 0 && gridX < gridCols && gridY >= 0 && gridY < gridRows) {
+        gridData[gridY][gridX] = true;
+        ctx.fillStyle = gridData[gridY][gridX] ? 'black' : 'white';
+        ctx.fillRect(gridX * gridSize, gridY * gridSize, gridSize, gridSize);
+        ctx.strokeStyle = '#ddd';
+        ctx.strokeRect(gridX * gridSize, gridY * gridSize, gridSize, gridSize);
+    }
+
+}
+function newAI() {
+    // clear the grid
+    gridData = Array(gridRows).fill().map(() => Array(gridCols).fill(false));
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000';
+    ctx.font = '24px Impact';
+    ctx.textAlign = 'center';
+    drawGrid();
+    drawPrompt();
+}
+canvas.addEventListener('click', function(event) {
+    var rect = canvas.getBoundingClientRect();
+    var x = event.clientX - rect.left;
+    var y = event.clientY - rect.top;
+
+    if (screenname == "home") {
+        screenname = "edit-grid";
+        clearbuttons();
+        drawhub();
+    } else if (screenname == "edit-grid" && x >= 0 && x < gridCols * gridSize && y >= 0 && y < gridRows * gridSize) {
+        toggleFill(x, y); // Toggle fill on the grid where clicked
+    }
+});
+// support dragging on the canvas and drawing on the grid
+var isDragging = false;
+canvas.addEventListener('mousedown', function(event) {
+    isDragging = true;
+});
+canvas.addEventListener('mouseup', function(event) {
+    isDragging = false;
+});
+canvas.addEventListener('mousemove', function(event) {
+    if (isDragging && screenname == "edit-grid") {
+        var rect = canvas.getBoundingClientRect();
+        var x = event.clientX - rect.left;
+        var y = event.clientY - rect.top;    
+        fill(x, y);        
+    }
+});
+drawMenu();
+
+</script>
+</body>
+</html>

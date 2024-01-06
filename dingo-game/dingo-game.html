@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Canvas Adventure Game</title>
+<style>
+  #gameCanvas {
+    border: 1px solid #000000;
+  }
+  .hidden {
+    display: none;
+  }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas" width="800" height="600"></canvas>
+<div id="choices" class="hidden">
+  <button id="btn1" onclick="makeChoice(1)">Search the ship for weapons</button>
+  <button id="btn2" onclick="makeChoice(2)">Try to fix the emergency beacon</button>
+  <button id="btn3" onclick="makeChoice(3)">Attempt to communicate with the 'dingos'</button>
+</div>
+
+<script>
+var canvas = document.getElementById('gameCanvas');
+var ctx = canvas.getContext('2d');
+var choicesDiv = document.getElementById('choices');
+
+function drawText(text, y) {
+  // Set a maximum height for the text to avoid clearing too much of the canvas
+  var lineHeight = 25; // Adjust line height as needed
+  var clearHeight = lineHeight * 1.2; // Clear a bit more than the line height to avoid overlap
+  ctx.clearRect(0, y - lineHeight, canvas.width, clearHeight);
+  ctx.fillStyle = 'black';
+  ctx.font = '20px Arial';
+  ctx.fillText(text, 10, y);
+}
+
+
+function showChoices() {
+    choicesDiv.classList.remove('hidden');
+}
+
+function startGame() {
+    drawText("After a turbulent space journey, you've crash-landed on an alien planet.", 30);
+    drawText("You are the only survivor.", 60);
+    drawText("You are surrounded by a herd of 'dingos'.", 90);
+    drawText("you can get guns, try to fix the radio beacon and escape, or be pals", 120);
+    showChoices(); // This should unhide the buttons
+}
+
+function makeChoice(choice) {
+    // Hide buttons before drawing new text
+    choicesDiv.classList.add('hidden');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Clear the canvas to draw new scenario text
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    switch(choice) {
+    case 1:
+        drawText("You found a laser pistol under a panel.", 30);
+        drawText("A 'dingo' is charging at you!", 60);
+        // Show new choices after finding the weapon
+        showNewChoices(['shoot', 'run', 'hide']);
+        break;
+
+    case 2:
+        drawText("You manage to get the beacon working.", 30);
+        drawText("The signal is sent, but it will take time for help to arrive.", 60);
+        // Show new choices after fixing the beacon
+        showNewChoices(['wait', 'explore', 'fortify']);
+        break;
+    case 3:
+        drawText("You attempt to communicate with the 'dingos'.", 30);
+        drawText("They seem to have a weird language system", 60);
+        drawText("until you realize the only thing they say is... are you a wuboo", 90);
+        showNewChoices(['befriend', 'teach', 'learn']);
+        break;
+    }
+    // Further game logic and button management goes here
+}
+function showNewChoices(options) {
+    // First, clear all existing buttons or hide them
+    Array.from(choicesDiv.children).forEach(button => button.classList.add('hidden'));
+
+    // Now create new buttons based on the options provided
+    options.forEach(option => {
+        var button = document.createElement('button');
+        button.textContent = option; // Set the button text to the option
+        button.onclick = function() { makeChoice(option); }; // Set the onclick event to makeChoice
+        choicesDiv.appendChild(button); // Add the button to the choices div
+    });
+
+    choicesDiv.classList.remove('hidden'); // Unhide the choices div to show new buttons
+}--
+
+// Start the game
+startGame();
+</script>
+
+    
+</body>
+</html>
