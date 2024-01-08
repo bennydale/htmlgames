@@ -3,10 +3,28 @@
 <head>
     <title>Snake Game</title>
     <style>
-        canvas {
-            background-color: #000;
-            display: block;
+         body {
+            background-color: #000000;
+            color: #ffffff;
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            font-size: 16px;
+            line-height: 1.5;
+            margin: 0;
+            padding: 0;
         }
+        h3 {
+            font-size: 1.5em;
+            font-weight: 400;
+            margin: 0;
+            padding: 0;
+        }
+        canvas {            
+            transform: translate(-50%, -50%);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            height: 100%;
+        }  
     </style>
 </head>
 <body>
@@ -25,8 +43,10 @@
     let gameStarted = false;
     let score = 0;
     var gameSpeed = 200;
+    let addedScore = false;
     function startGame() {
         if (!gameStarted) {
+            addedScore = false;
             gameStarted = true;
             snake = [{x: 10, y: 10}];
             dx = gridSize;
@@ -35,11 +55,18 @@
             gameLoop();
         }
     }
+    // prevent default for up and down keys
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault();
+        }
+    });
+
     function drawTitleScreen() {
         ctx.fillStyle = 'white';
-        ctx.font = '20px Impact';
-        ctx.fillText("Snake 2: The Long Awaited Sequel", 20, canvas.height / 2 - 50);
-        ctx.font = '20px Impact';
+        ctx.font = '40px impact';
+        ctx.fillText("Snake:    eat,  love,  die", 20, canvas.height / 2 - 50);
+        ctx.font = '20px impact';
         ctx.fillText("Press any key to start", 100, canvas.height / 2);
         // bind any key to the startGame function
         document.addEventListener('keydown', startGame, {once: true});
@@ -66,7 +93,26 @@
             ctx.fillRect(snake[i].x * gridSize, snake[i].y * gridSize, gridSize, gridSize);
         }
     }
+    let lastDirection = 'right';
     function moveSnake() {
+        switch(lastDirection){
+            case 'right':
+                dx = gridSize;
+                dy = 0;
+                break;
+            case 'left':
+                dx = -gridSize;
+                dy = 0;
+                break;
+            case 'up':
+                dx = 0;
+                dy = -gridSize;
+                break;
+            case 'down':
+                dx = 0;
+                dy = gridSize;
+                break;
+        }
         const head = {x: snake[0].x + dx / gridSize, y: snake[0].y + dy / gridSize};
         snake.unshift(head);
         if (head.x === food.x && head.y === food.y) {
@@ -83,19 +129,15 @@
     }
     // bind arrow keys to the changeDirection function
     document.addEventListener('keydown', changeDirection);
-    function changeDirection(e) {
-        if (e.key === 'ArrowLeft' && dx !== gridSize) {
-            dx = -gridSize;
-            dy = 0;
+    function changeDirection(e) {        
+        if (e.key === 'ArrowLeft' && dx !== gridSize) {                        
+            lastDirection = 'left';
         } else if (e.key === 'ArrowUp' && dy !== gridSize) {
-            dx = 0;
-            dy = -gridSize;
+            lastDirection = 'up';
         } else if (e.key === 'ArrowRight' && dx !== -gridSize) {
-            dx = gridSize;
-            dy = 0;
+            lastDirection = 'right';
         } else if (e.key === 'ArrowDown' && dy !== -gridSize) {
-            dx = 0;
-            dy = gridSize;
+            lastDirection = 'down';
         }
     }
     function drawScore() {
@@ -106,12 +148,36 @@
     function clearCanvas() {
         ctx.fillStyle = 'black';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // draw red border
+        ctx.strokeStyle = 'red';
+        ctx.strokeRect(0, 0, canvas.width, canvas.height);
     }
 
     function gameLoop() {
         if (isGameOver()) {
             gameStarted = false;
             drawGameOver();
+            if( addedScore == false){                
+                addedScore = true;
+                fetch("/api/games/addScore", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        userid: localStorage.getItem('userid'),
+                        token: localStorage.getItem('token'),
+                        game_id: "snake",
+                        score: score
+                    })
+                });
+                // call "refresh scores on outer page"
+                try {
+                    window.parent.refreshScores();
+                } catch (e) {
+                    console.log(e);
+                }
+            }
             return;
         }
 
@@ -132,6 +198,10 @@
         ctx.fillText("Game Over", 100, canvas.height / 2);
         ctx.font = '20px Arial';
         ctx.fillText("Score: " + score, 150, canvas.height / 2 + 50);
+        ctx.font = '20px Times New Roman';
+        ctx.fillText("Press any key to play again", 100, canvas.height / 2 + 100);
+        // bind any key to the startGame function
+        document.addEventListener('keydown', startGame, {once: true});
     }
 
     // Check if the game is over

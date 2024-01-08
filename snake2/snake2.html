@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Snake Game</title>
+    <style>
+         body {
+            background-color: #000000;
+            color: #ffffff;
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            font-size: 16px;
+            line-height: 1.5;
+            margin: 0;
+            padding: 0;
+        }
+        h3 {
+            font-size: 1.5em;
+            font-weight: 400;
+            margin: 0;
+            padding: 0;
+        }
+        canvas {            
+            transform: translate(-50%, -50%);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            height: 100%;
+        }  
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+</body>
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const gridSize = 20;
+    const gridWidth = canvas.width / gridSize;
+    const gridHeight = canvas.height / gridSize;
+    let snake = [{x: 10, y: 10}];    
+    var foodArray = [
+        {x: 15, y: 15}
+
+    ];
+    let dx = gridSize;
+    let dy = 0;
+    let gameStarted = false;
+    let score = 0;
+    var gameSpeed = 200;
+    let addedScore = false;
+    let randomEventCountdown = 4;
+    let snakeColor = "green"
+    let foodColor = "red"
+    let backgroundColor = "black"
+    let level = 0
+    var modeTitle = ""
+    let modalTitle = ""
+    let modexp = ""
+    let xp = 0
+    let levelEvent = false
+    var audio = new Audio('xpsound.mp3');
+    let displayModal = false;
+    let globalTextColor = "white"
+    let money = 0
+    let microTransactions = false
+    let showMoneyModal = false
+    let currentMoneyPage = 0
+    let loopActive = false
+    let notEnoughMoney = false
+    var randomBonusActive = false
+    let randomMoneyBonus = false
+    let isDisplayAd = false
+    let displaAdd = false
+    let reverseControls = false
+    let lastDirection = 'right';
+    let edgeTeleportation = false
+    let AMERICA = false
+    let moneyPages =[
+        {
+            'name': "ScrApIes JunK YaRd",
+            'op1': "press 1 to slow down SLIGHTLY",
+            'op1price': 15,
+            'op1stock': 3,
+            'op1func': () => {
+                gameSpeed = gameSpeed + 15
+            },
+            'op2': "press 2 to buy something that literatly does nothing",
+            'op2price': 20,
+            'op2stock': 9999999,
+            'op2func': () => {
+                console.log("this does nothing")
+            },
+            'op3': "press 3 to cut your tail in half",
+            'op3price': 30,
+            'op3stock': 2,
+            'op3func': () => {
+                snake = snake.slice(0, snake.length / 2)
+            }            
+        },
+        {
+            'name': "bonny's stars for starz",
+            'op1': "press 1 to slow down moderately",
+            'op1price': 25,
+            'op1stock': 3,
+            'op1func': () => {
+                gameSpeed = gameSpeed + 25
+            },
+            'op2': "press 2 to buy 5 score",
+            'op2price': 40,
+            'op2stock': 1,
+            'op2func': () => {
+                score = score + 5
+            },
+            'op3': "press 3 to get a 25% chance of getting extra score",
+            'op3price': 30,
+            'op3stock': 1,
+            'op3func': () => {
+                randomBonusActive = true
+            }
+        },
+        {
+            'name': "jerrys high-end shop",
+            'op1': "press 1 to reset speed",
+            'op1price': 55,
+            'op1stock': 3,
+            'op1func': () => {
+                gameSpeed = 200
+            },
+            'op2': "press 2 to increase money bonus",
+            'op2price': 70,
+            'op2stock': 1,
+            randomMoneyBonus: true,
+            'op3': "press 3 to spawn four food items",
+            'op3price': 60,
+            'op3stock': 1,
+            'op3func': () => {
+                placeFood()
+                placeFood()
+                placeFood()
+                placeFood()
+            }
+
+        },
+        {
+            'name': "rare-finds auctions",
+            'op1': "press 1 get a extra life",
+            'op1price': 90,
+            'op1stock': 2,
+            'op1func': () => {
+                snake.push({x: 10, y: 10})
+            },
+            'op2': "press 2 to get a obsesive buying dissorder badge",            
+            'op2price': 110,
+            'op2stocknote': '(this badge will go on your profile)',
+            'op2stock': 1,
+            'op2func': () => {
+                console.log("this does nothing for now")
+            },
+            'op3': "press 3 to buy 20 score",
+            'op3price': 150,
+            'op3stock': 1,
+            'op3func': () => {
+                score = score + 20
+            }
+        }        
+    ]
+    let modes = [
+        {
+            name: "micro transactions",
+            microTransactions: true,
+            money: -1
+        },
+        {
+            name: "INVERTED COLORS",
+            snakeColor: "blue",
+            foodColor: "green",
+            backgroundColor: "white",
+            levelEvent: false,
+            globalTextColor: "black"
+        },
+        {
+            name: "LEVEL SYSTEM",           
+            levelEvent: true
+        },
+        {
+            name: "SPEED UP",
+            gameSpeed: 100
+        },
+        {
+            name: "CHILL OUT",
+            gameSpeed: 300
+        },
+        {
+            name: "pop-up ads",
+            isDisplayAd: true
+        },
+        {
+            name:"REVERSE CONTROLS",
+            reverseControls: true
+        },
+        {
+            name: "EDGE TELEPORTATION",
+            edgeTeleportation: true
+        },
+        {
+            name: "AMERICA",
+            snakeColor: "red",
+            foodColor: "blue",
+            backgroundColor: "white",
+            levelEvent: false,
+            globalTextColor: "white"
+        }
+    ]    
+    function startGame() {
+        if (!gameStarted) {
+            lastDirection = 'right';
+            addedScore = false;
+            gameStarted = true;
+            snake = [{x: 10, y: 10}];
+            dx = gridSize;
+            dy = 0;
+            score = 0;
+            gameSpeed = 200;
+            level = 0
+            xp = 0
+            levelEvent = false
+            modeTitle = ""
+            modexp = ""
+            displayModal = false;
+            randomEventCountdown = 4;
+            snakeColor = "green"
+            foodColor = "red"
+            backgroundColor = "black"
+            globalTextColor = "white"
+            microTransactions = false
+            showMoneyModal = false
+            currentMoneyPage = 0
+            money = 0
+            randomBonusActive = false
+            reverseControls = false
+            loopActive = false
+            AMERICA = false
+            foodArray = [
+                {x: 15, y: 15}
+            ];
+            gameLoop();
+        }
+    }
+    // prevent default for up and down keys
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault();
+        }
+    });
+    // when holding shift and pressing a number set random event to foced mode    
+    document.addEventListener('keydown', function(e) {
+        console.log(e.key);
+        if (e.key === 'F1') {
+            randomEvent(0);
+            e.preventDefault();        
+        }
+        if (e.key === 'F2') {
+            randomEvent(1);
+            e.preventDefault();        
+        }
+        if (e.key === 'F3') {
+            randomEvent(2);
+            e.preventDefault();        
+        }
+        if (e.key === 'F4') {
+            randomEvent(3);
+            e.preventDefault();        
+        }
+        if (e.key === 'F5') {
+            randomEvent(4);
+            e.preventDefault();        
+        }        
+        if (e.key === 'F6') {
+            randomEvent(5);
+            e.preventDefault();        
+        }
+        if (e.key === 'F7') {
+            randomEvent(6);
+            e.preventDefault();        
+        }
+        if (e.key === 'F8') {
+            randomEvent(7);
+            e.preventDefault();        
+        }
+        if (e.key === 'F9') {
+            randomEvent(8);
+            e.preventDefault();        
+        }
+        if (e.key === '4') {
+            showMoneyModal=true            
+        }    
+        if(showMoneyModal==true){
+            if (e.key === 'q') {
+                currentMoneyPage = currentMoneyPage - 1
+                if (currentMoneyPage < 0){
+                    currentMoneyPage = moneyPages.length - 1
+                }
+                e.preventDefault();        
+            }
+            if (e.key === 'e') {
+                currentMoneyPage = currentMoneyPage + 1
+                if (currentMoneyPage > moneyPages.length - 1){
+                    currentMoneyPage = 0
+                }
+                e.preventDefault();        
+            }
+            if (e.key === '1') {
+                if (money >= moneyPages[currentMoneyPage].op1price){
+                    // load and play money.mp3
+                    var audio = new Audio('money.mp3');
+                    audio.play();
+                    //clean up after the audio is done playing
+                    audio.addEventListener("ended", function(){
+                        audio.remove();
+                    });
+                    money = money - moneyPages[currentMoneyPage].op1price                    
+                    moneyPages[currentMoneyPage].op1stock = moneyPages[currentMoneyPage].op1stock - 1
+                    if (moneyPages[currentMoneyPage].op1stock == 0){
+                        moneyPages[currentMoneyPage].op1stock = "out of stock"
+                    }
+                    moneyPages[currentMoneyPage].op1func()
+                } else {
+                    notEnoughMoney = 1              
+                }
+                e.preventDefault();        
+            }
+            if (e.key === '2') {
+                if (money >= moneyPages[currentMoneyPage].op2price){
+                    // load and play money.mp3
+                    var audio = new Audio('money.mp3');
+                    audio.play();
+                    //clean up after the audio is done playing
+                    audio.addEventListener("ended", function(){
+                        audio.remove();
+                    });
+                    money = money - moneyPages[currentMoneyPage].op2price
+                    moneyPages[currentMoneyPage].op2stock = moneyPages[currentMoneyPage].op2stock - 1
+                    if (moneyPages[currentMoneyPage].op2stock == 0){
+                        moneyPages[currentMoneyPage].op2stock = "out of stock"
+                    }
+                    moneyPages[currentMoneyPage].op2func()
+                } else {
+                    notEnoughMoney = 2              
+                }
+                e.preventDefault();        
+            }
+            if (e.key === '3') {
+                if (money >= moneyPages[currentMoneyPage].op3price){
+                    // load and play money.mp3
+                    var audio = new Audio('money.mp3');
+                    audio.play();
+                    //clean up after the audio is done playing
+                    audio.addEventListener("ended", function(){
+                        audio.remove();
+                    });
+                    money = money - moneyPages[currentMoneyPage].op3price
+                    moneyPages[currentMoneyPage].op3stock = moneyPages[currentMoneyPage].op3stock - 1
+                    if (moneyPages[currentMoneyPage].op3stock == 0){
+                        moneyPages[currentMoneyPage].op3stock = "out of stock"
+                    }
+                    moneyPages[currentMoneyPage].op3func()
+                } else {
+                    notEnoughMoney = 3              
+                }
+                e.preventDefault();        
+            }
+            gameLoop();
+        }
+    });        
+
+    function drawTitleScreen() {
+        ctx.fillStyle = globalTextColor;
+        ctx.font = '40px impact';
+        ctx.fillText("snake 2 the sequel", 20, canvas.height / 2 - 50);
+        ctx.font = '20px impact';
+        ctx.fillText("Press any key to start", 100, canvas.height / 2);
+        // bind any key to the startGame function
+        document.addEventListener('keydown', startGame, {once: true});
+
+    }
+    function randomEvent(forcedMode){
+        
+        let randomMode = Math.floor(Math.random() * modes.length)
+        if (typeof forcedMode !== 'undefined' ){
+            randomMode = forcedMode
+        }
+      
+        console.log("random mode: ", modes[randomMode].name)
+        if  (modes[randomMode].snakeColor){
+            snakeColor = modes[randomMode].snakeColor
+        }
+        if (modes[randomMode].foodColor){
+            foodColor = modes[randomMode].foodColor
+        }
+        if (modes[randomMode].backgroundColor){
+            backgroundColor = modes[randomMode].backgroundColor
+        }
+        if (modes[randomMode].gameSpeed){
+            gameSpeed = modes[randomMode].gameSpeed
+        }
+        if (modes[randomMode].levelEvent){
+            levelEvent = modes[randomMode].levelEvent
+        }
+        if (modes[randomMode].snakeColor){
+            snakeColor = modes[randomMode].snakeColor
+        }   
+        if (modes[randomMode].globalTextColor){
+            globalTextColor = modes[randomMode].globalTextColor
+        }
+        if (modes[randomMode].microTransactions){
+            microTransactions = modes[randomMode].microTransactions
+        }
+        if (modes[randomMode].name == "LEVEL SYSTEM"){
+            modeTitle = "level " + level
+            modexp = "xp " + xp.toFixed(2)
+        }
+        if (modes[randomMode].money == -1){
+            money =0
+            modes[randomMode].money =0
+        }
+        if (modes[randomMode].isDisplayAd){           
+            isDisplayAd = true
+        }
+        if (modes[randomMode].reverseControls){
+           reverseControls = true
+        } else {
+            reverseControls = false
+        }
+        if (modes[randomMode].edgeTeleportation){
+            edgeTeleportation = true
+        }
+        if (modes[randomMode].name == "AMERICA"){
+            snakeColor = "red"
+            foodColor = "blue"
+            backgroundColor = "white"
+            levelEvent = false
+            globalTextColor = "white"
+            AMERICA = true
+        }
+
+        modalTitle = modes[randomMode].name
+        // set displayModal to true
+        displayModal = true;
+    }
+    function placeFood() {
+        // Generate a random number the food x-coordinate
+        let foodX = Math.floor(Math.random() * gridWidth);
+        // Generate a random number for the food y-coordinate
+        let foodY = Math.floor(Math.random() * gridHeight);
+        // check if the snake is on the food. if it is on the food regenerate the food
+        for (let i = 0; i < snake.length; i++) {
+            if (snake[i].x === foodX && snake[i].y === foodY) {
+                return placeFood();
+            }
+        }
+        // check if the food is on the food. if it is on the food regenerate the food
+        for (let i = 0; i < foodArray.length; i++) {
+            if (foodArray[i].x === foodX && foodArray[i].y === foodY) {
+                return placeFood();
+            }
+        }
+        // if the above checks pass, it is safe to place the food
+        foodArray.push({x: foodX, y: foodY});
+    }
+    function drawFood() {
+        ctx.fillStyle = foodColor;
+        for (let i = 0; i < foodArray.length; i++) {
+            ctx.fillRect(foodArray[i].x * gridSize, foodArray[i].y * gridSize, gridSize, gridSize);
+        }
+    }
+    // this is the snake secion
+    function drawSnake() {
+        ctx.fillStyle = snakeColor;
+        for (let i = 0; i < snake.length; i++) {
+            ctx.fillRect(snake[i].x * gridSize, snake[i].y * gridSize, gridSize, gridSize);
+        }
+    }
+
+    function moveSnake() {
+        switch(lastDirection){
+            case 'right':
+                dx = gridSize;
+                dy = 0;
+                break;
+            case 'left':
+                dx = -gridSize;
+                dy = 0;
+                break;
+            case 'up':
+                dx = 0;
+                dy = -gridSize;
+                break;
+            case 'down':
+                dx = 0;
+                dy = gridSize;
+                break;
+        }
+        const head = {x: snake[0].x + dx / gridSize, y: snake[0].y + dy / gridSize};
+        snake.unshift(head);
+        // check if the snake is on the food
+        let foodEaten = false;
+        for (let i = 0; i < foodArray.length; i++) {
+            if (snake[0].x === foodArray[i].x && snake[0].y === foodArray[i].y) {
+                foodArray.splice(i, 1);
+                score++;
+                if (randomBonusActive == true){
+                    if (Math.random() > 0.75){
+                        score = score + 1
+                    }
+                }
+               
+                console.log("starting speed " + gameSpeed);
+                let = incimentGameSpeed = Math.round(Math.random()*5)
+                console.log(incimentGameSpeed);
+                gameSpeed = gameSpeed - incimentGameSpeed;
+                console.log("later gamespeed " + gameSpeed);
+                randomEventCountdown--;
+                if (randomEventCountdown == 0){
+                    randomEvent();
+                    randomEventCountdown = 4;
+                }
+                if (levelEvent == true){
+                    xp = xp + parseFloat((Math.random() * 7).toFixed(2));
+                    if (xp > 10){
+                        xp = 0
+                        level = level + 1
+                        audio.play();
+                    }
+                    modeTitle = "level " + level
+                    modexp = "xp " + xp
+                }
+                money = money + parseFloat((Math.random() * 7).toFixed(2));
+                if (randomMoneyBonus == true){
+                    money = money + parseFloat((Math.random() * 10).toFixed(2));
+                }
+                // if its the last food item place 1 more                
+                placeFood();                
+                foodEaten = true; 
+            }
+        }
+        if (!foodEaten) {
+            snake.pop();
+        }
+    }
+    // bind arrow keys to the changeDirection function
+    document.addEventListener('keydown', changeDirection);
+    function changeDirection(e) {        
+        if( reverseControls){
+            if (e.key === 'ArrowLeft' && dx !== -gridSize) {                                 
+                lastDirection = 'right';            
+            } else if (e.key === 'ArrowUp' && dy !== -gridSize) {
+                lastDirection = 'down';            
+            } else if (e.key === 'ArrowRight' && dx !== gridSize) {            
+                lastDirection = 'left';            
+            } else if (e.key === 'ArrowDown' && dy !== gridSize) {            
+                lastDirection = 'up';
+            }      
+            return
+        } else {
+            if (e.key === 'ArrowLeft' && dx !== gridSize) {                                
+                lastDirection = 'left';            
+            } else if (e.key === 'ArrowUp' && dy !== gridSize) {
+                lastDirection = 'up';            
+            } else if (e.key === 'ArrowRight' && dx !== -gridSize) {            
+                lastDirection = 'right';            
+            } else if (e.key === 'ArrowDown' && dy !== -gridSize) {            
+                lastDirection = 'down';
+            }      
+        }
+    }
+    function drawScore() {
+        ctx.fillStyle = globalTextColor;
+        ctx.font = '20px Arial';
+        ctx.fillText("Score: " + score, 10, 20);
+    }
+    function clearCanvas() {
+        ctx.fillStyle = backgroundColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // if america mode is on set the background to AMERICA.png
+        if (AMERICA == true){
+            var img = new Image();
+            img.src = 'AMERICA.png';
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        }
+
+        // draw red border
+        ctx.strokeStyle = 'red';
+        ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+
+        ctx.fillStyle = "#522d00"
+        ctx.font = 'italic 20px Times New Roman'
+        ctx.fillText(modeTitle, 10, 40)
+        ctx.fillText(modexp, 10, 60)
+
+        if (microTransactions == true){
+            ctx.fillStyle = "green";
+            ctx.font = '20px impact';
+            ctx.fillText("money: " + money.toFixed(2), 10, 370);
+            ctx.fillText("press 4 to buy buy buy", 10, 390);
+        }
+    }   
+    function gameLoop() {
+        if( showMoneyModal==true){
+            ctx.fillStyle = "gray";
+            ctx.fillRect(50, 100, 300, 200);
+            ctx.strokeStyle = "black";
+            ctx.beginPath();
+            ctx.moveTo(50,125);
+            ctx.lineTo(350,125);
+            ctx.stroke();
+            const moneyPage = moneyPages[currentMoneyPage]
+
+            // draw the mode title
+            ctx.fillStyle = "black";
+            ctx.font = '30px Times New Roman'
+            ctx.fillText(moneyPage.name, 60, 160)
+            ctx.font = '30px Impact'
+            ctx.fillText("money: " + money.toFixed(2), 60, 190)
+
+            // draw an X in the upper right corner of the box
+            ctx.fillStyle = "red";
+            ctx.font = 'italic 20px Times New Roman'
+            ctx.fillText("X", 320, 120)
+            
+            // draw the current money Page            
+            ctx.fillStyle = "green"
+            ctx.font = '14px impact'
+            ctx.fillText(moneyPage.op1, 50, 210)
+            ctx.fillStyle = "black"
+            if (notEnoughMoney == 1){
+                ctx.fillStyle = "red"
+                ctx.fillText("not enough money", 200, 223)
+                notEnoughMoney = false
+                setTimeout(gameLoop, 1000);
+            }
+            ctx.fillText( '$'+ moneyPage.op1price.toFixed(2) + ' ' + moneyPage.op1stock + ' in stock', 50, 223)
+            ctx.fillStyle = "green"
+            ctx.fillText(moneyPage.op2, 50, 235)
+            ctx.fillStyle = "black"
+            if (notEnoughMoney==2){
+                ctx.fillStyle = "red"
+                ctx.fillText("not enough money", 200, 248)
+                notEnoughMoney = false
+                setTimeout(gameLoop, 1000);
+            }
+            const snote = moneyPage.op2stocknote ? moneyPage.op2stocknote : ""
+            ctx.fillText( '$'+ moneyPage.op2price.toFixed(2) + ' ' + moneyPage.op2stock + ' in stock ' + snote, 50, 248)
+
+            ctx.fillStyle = "green"
+            ctx.fillText(moneyPage.op3, 50, 260)
+            ctx.fillStyle = "black"            
+            if (notEnoughMoney==3){
+                ctx.fillStyle = "red"
+                ctx.fillText("not enough money", 200, 273)
+                notEnoughMoney = false
+                setTimeout(gameLoop, 1000);
+            }
+            ctx.fillText( '$'+ moneyPage.op3price.toFixed(2) + ' ' + moneyPage.op3stock + ' in stock', 50, 273)
+
+            ctx.fillStyle = "green"
+            ctx.font = '20px impact'
+            ctx.fillText("<< Q previous", 80, 290)
+            ctx.fillText("next E >>", 250, 290)
+
+            // if moneyMode is true draw the money options:
+            canvas.addEventListener('click', function(event) {
+                console.log("click")
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;    // scale factor for width
+                const scaleY = canvas.height / rect.height;  // scale factor for height
+
+                const x = (event.clientX - rect.left) * scaleX;
+                const y = (event.clientY - rect.top) * scaleY;
+
+                const xPercent = (x / canvas.width) * 100;
+                const yPercent = (y / canvas.height) * 100;
+
+                if( xPercent > 79 && xPercent < 85 && yPercent > 26 && yPercent < 31){
+                    console.log("close the modal");
+                    showMoneyModal = false;
+                    displayModal = false
+                }
+                gameLoop();
+            }, {once: true});                                    
+            return
+        }
+
+        if( displayModal == true){       
+            if (isDisplayAd == true) {
+                let adArray = [
+                    "CORN.mp4",
+                    "johnsalmon.mp4",
+                    "KITCHENGUN.mp4",
+                    "RICKROLE.mp4",
+                ]
+                // add a video tag absolute over the canvas
+                let video = document.createElement('video');
+                // set the source to a random video
+                video.src = adArray[Math.floor(Math.random() * adArray.length)];
+                // set the video to play
+                video.play();
+                // hide the gui
+                video.controls = false;
+                // set the video to be absolute over the canvas
+                video.style.position = "absolute";
+                // set the video to be centered
+                video.style.left = "50%";
+                video.style.top = "50%";
+                video.style.transform = "translate(-50%, -50%)";
+                // set the video to be the same size as the canvas
+                video.style.width = "100%";
+                video.style.height = "100%";
+                // add the video to the body
+                document.body.appendChild(video);
+                // when the video is done playing remove it
+               
+                // add a transperent black skip button on the bottom of the screen
+                let skipButton = document.createElement('button');
+                // count down from five seconds
+                let secondsLeft = 6;
+                let timer = setInterval(function(){
+                    secondsLeft--;
+                    skipButton.innerHTML = "you can skip this ad in " + secondsLeft + " seconds";
+                    if (secondsLeft == 0){
+                        clearInterval(timer);
+                        skipButton.innerHTML = "skip ad";
+                        skipButton.addEventListener("click", function(){
+                        video.remove();
+                        // remove the skip button
+                        skipButton.remove();
+                        isDisplayAd = false
+                        gameLoop();
+                    }); 
+                    }
+                }, 1000);
+
+                skipButton.innerHTML = "you can skip this ad in" + secondsLeft + " seconds";
+                skipButton.style.position = "absolute";
+                skipButton.style.left = "0px";
+                skipButton.style.top = "80%";
+                skipButton.style.bottom = "0px";
+                skipButton.style.right = "0px";
+                skipButton.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+                skipButton.style.color = "white";
+                skipButton.style.border = "none";
+                skipButton.style.padding = "15px 32px";
+                skipButton.style.textAlign = "center";
+                skipButton.style.textDecoration = "none";
+                skipButton.style.display = "inline-block";
+                skipButton.style.fontSize = "100px";
+                skipButton.style.margin = "4px 2px";
+                skipButton.style.cursor = "pointer";
+                              
+                document.body.appendChild(skipButton);
+
+                video.addEventListener("ended", function(){
+                    video.remove();
+                    skipButton.remove();
+                    isDisplayAd = false
+                    gameLoop();
+                });
+
+                return
+            }
+
+            
+            // draw a box in the middle of the screen
+            ctx.fillStyle = "gray";
+            ctx.fillRect(50, 100, 300, 200);
+            ctx.strokeStyle = "black";
+            ctx.beginPath();
+            ctx.moveTo(50,125);
+            ctx.lineTo(350,125);
+            ctx.stroke();
+            // draw the mode title
+            ctx.fillStyle = "black";
+            ctx.font = '30px Times New Roman'
+            ctx.fillText("RANDOM EVENT", 80, 160)
+            ctx.font = '30px Impact'
+            ctx.fillText(modalTitle, 80, 200)
+
+            // draw an X in the upper right corner of the box
+            ctx.fillStyle = "red";
+            ctx.font = 'italic 20px Times New Roman'
+            ctx.fillText("X", 320, 120)
+
+            // if moneyMode is true draw the money options:
+
+            console.log("bind close button")
+            canvas.addEventListener('click', function(event) {
+                console.log("click")
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;    // scale factor for width
+                const scaleY = canvas.height / rect.height;  // scale factor for height
+
+                const x = (event.clientX - rect.left) * scaleX;
+                const y = (event.clientY - rect.top) * scaleY;
+
+                const xPercent = (x / canvas.width) * 100;
+                const yPercent = (y / canvas.height) * 100;
+
+                if( xPercent > 79 && xPercent < 85 && yPercent > 26 && yPercent < 31){
+                    console.log("close the modal");
+                    displayModal = false;
+                    showMoneyModal = false;                    
+                }
+                gameLoop();
+            }, {once: true});
+            
+            return 
+        }        
+        if (isGameOver()) {
+            gameStarted = false;
+            drawGameOver();
+            if( addedScore == false){                
+                addedScore = true;
+                fetch("/api/games/addScore", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        userid: localStorage.getItem('userid'),
+                        token: localStorage.getItem('token'),
+                        game_id: "snake2",
+                        score: score
+                    })
+                });
+                // call "refresh scores on outer page"
+                try {
+                    window.parent.refreshScores();
+                } catch (e) {
+                    console.log(e);
+                }
+            }
+            return;
+        }
+        if( loopActive == true){
+            return
+        }
+        setTimeout(() => {
+            clearCanvas();
+            drawFood();
+            moveSnake();
+            drawSnake();
+            drawScore();
+            loopActive = false
+            gameLoop();
+        }, gameSpeed);
+        loopActive = true
+    }
+
+    // Draw the game over screen
+    function drawGameOver() {
+        xp = 0
+        level = 0
+        ctx.fillStyle = globalTextColor;
+        ctx.font = '50px Arial';
+        ctx.fillText("Game Over", 100, canvas.height / 2);
+        ctx.font = '20px Arial';
+        ctx.fillText("Score: " + score, 150, canvas.height / 2 + 50);
+        ctx.font = '20px Times New Roman';
+        ctx.fillText("Press any key to play again", 100, canvas.height / 2 + 100);
+        // bind any key to the startGame function
+        document.addEventListener('keydown', startGame, {once: true});
+    }
+
+    // Check if the game is over
+    function isGameOver() {        
+        for (let i = 4; i < snake.length; i++) {
+            if (snake[i].x === snake[0].x && snake[i].y === snake[0].y) return true;
+        }
+        if (edgeTeleportation == false){
+            const hitLeftWall = snake[0].x < 0;
+            const hitRightWall = snake[0].x >= gridWidth;
+            const hitToptWall = snake[0].y < 0;
+            const hitBottomWall = snake[0].y >= gridHeight;
+
+            return hitLeftWall || hitRightWall || hitToptWall || hitBottomWall;
+        } else {
+            if (snake[0].x < 0){
+                snake[0].x = gridWidth - 1
+            }
+            if (snake[0].x >= gridWidth){
+                snake[0].x = 0
+            }
+            if (snake[0].y < 0){
+                snake[0].y = gridHeight - 1
+            }
+            if (snake[0].y >= gridHeight){
+                snake[0].y = 0
+            }
+        }
+        
+    }
+
+    // Other functions (drawSnake, moveSnake, clearCanvas, drawFood, placeFood, changeDirection, drawScore)
+
+    // Initial call to show the title screen
+    drawTitleScreen();
+</script>
+
+</html>
