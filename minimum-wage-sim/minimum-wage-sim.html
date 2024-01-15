@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Min Wage Sim</title>
+    <style>
+        body {
+           background-color: #000000;
+           color: #ffffff;
+           font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+           font-size: 16px;
+           line-height: 1.5;
+           margin: 0;
+           padding: 0;
+       }
+       h3 {
+           font-size: 1.5em;
+           font-weight: 400;
+           margin: 0;
+           padding: 0;
+       }
+       canvas {            
+           transform: translate(-50%, -50%);
+           position: absolute;
+           top: 50%;
+           left: 50%;           
+       }  
+   </style>
+</head>
+<body>   
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+    <script src="omggif.js"></script>
+    <script>        
+        // bind on window resize event to resize the canvas to fill the screen
+        window.addEventListener("resize", resizeCanvas);
+        function resizeCanvas() {            
+            var canvas = document.getElementById("gameCanvas");
+            if(window.innerWidth > window.innerHeight) {        
+                canvas.style.height = "100%"
+                canvas.style.width = "auto"
+            } else {
+                canvas.style.height = "auto"
+                canvas.style.width = "100%"
+            }
+        }
+        resizeCanvas();
+        // Create the canvas
+        var canvas = document.getElementById("gameCanvas");
+        var ctx = canvas.getContext("2d");
+        // create the main game loop        
+        var gameMode = "titleScreen";
+        let riotMode = false;
+        let titleScreenX = 10
+        
+        let incredients = [
+            {
+                name: "P",
+                button:{
+                    x: 50,
+                    y: 200,
+                    width: 110,
+                    height: 18,
+                    activeCountDown: 0,
+                },                
+                src: "patty.png",       
+                cost: .5,         
+            },
+            {
+                name: "O",
+                button:{
+                    x: 50,
+                    y: 225,
+                    width: 110,
+                    height: 18,
+                    activeCountDown: 0,
+                },                
+                src: "onions.png",
+                cost: .20,
+            },
+            {
+                name: "C",
+                button:{
+                    x: 50,
+                    y: 255,
+                    width: 110,
+                    height: 25,
+                    activeCountDown: 0,
+                },                
+                src: "cheese.png",
+                cost: .15,
+            }
+            ,
+            {
+                name: "L",
+                button:{
+                    x: 50,
+                    y: 285,
+                    width: 110,
+                    height: 25,
+                    activeCountDown: 0,
+                },                
+                src: "lettuce.png",
+                cost: .10,
+            }
+            ,
+            {
+                name: "T",
+                button:{
+                    x: 50,
+                    y: 315,
+                    width: 110,
+                    height: 25,
+                    activeCountDown: 0,
+                },                
+                src: "tomatoes.png",
+                cost: .25,
+            }
+            ,
+            {
+                name: "B",
+                button:{
+                    x: 50,
+                    y: 345,
+                    width: 110,
+                    height: 25,
+                    activeCountDown: 0,
+                },                
+                src: "bottombun.png",
+                cost: .25,
+            }
+            ,
+            {
+                name: "TB",
+                button:{
+                    x: 50,
+                    y: 375,
+                    width: 110,
+                    height: 25,
+                    activeCountDown: 0,
+                },                
+                src: "topbun.png",
+                cost: .25,
+            }
+        ]
+    
+        let onScreenIncredients = [];
+        const grill = {
+            x: 202,
+            y: 160            
+        }        
+        const possibleOrders = [{            
+            name: 'double',
+            incredients: ['L', 'P', 'T', 'C', 'P', 'C'],
+            cost: 2,            
+        },
+        {
+            name: "single",
+            incredients: ['L', 'P', 'T', 'C'],
+            cost: 1.5,
+        },
+        {
+            name: "chez burger",
+            incredients: ['P', 'C'],
+            cost: 1.5,
+        },
+        {
+            name: "veggie",
+            incredients: ['L', 'T', 'L'],
+            cost: 1.5,
+        },
+        {
+            name: "CHEZZZZZZ",
+            incredients: ['C', 'C', 'C', 'C'],
+            cost: 1.5,}
+
+        ]
+        const orders = []
+        let money = 10
+        // add a customer every 10 seconds
+        let lastCustomerAddTime = new Date();
+        const level = 0;
+        const customers = []
+        const customerNames = [
+            'freddy fazbear',
+            'crusty musty',
+            'jimmy john',
+            'ur mom',
+            'ikilled100people',
+            'joe mama',
+            'joe biden',
+            'randuy',
+            'i hate myself',
+            'border.radius'
+        ]
+        const angryFaces = [
+            new Image(),
+            new Image(),
+            new Image(),
+            new Image(),
+        ]
+        MAX_CUSTOMERS = 6
+        // set the src of each angry face            
+        angryFaces[0].src = 'aface1.png'
+        angryFaces[1].src = 'aface2.png'
+        angryFaces[2].src = 'aface3.png'
+        angryFaces[3].src = 'aface4.png'
+        const happyFaces = [
+            new Image(),
+            new Image(),
+            new Image(),
+            new Image(),
+            new Image()
+        ]
+        // set the src of each happy face
+        happyFaces[0].src = 'hface1.png'
+        happyFaces[1].src = 'hface2.png'
+        happyFaces[2].src = 'hface3.png'
+        happyFaces[3].src = 'hface4.png'
+        happyFaces[4].src = 'hface5.png'
+        
+        const pitchforkImg = new Image();
+        pitchforkImg.src = "pitchfork.png"; 
+        const torchImg = new Image();
+        torchImg.src = "torch.png";
+        const kitchenImg = new Image();
+        kitchenImg.src = "kitchen.png";
+        const bgImage = new Image();
+        bgImage.src = "background.png";
+        const bellImg = new Image();
+        bellImg.src = "bell.png"; 
+        let updatedMusic = false;
+        let finalMusic = false;
+        let screaming = new Audio('angrymob.mp3');
+        let arguing = new Audio('arguing.mp3');
+        let fire = new Audio('fire.mp3');
+        let fireheight = 0;
+        function drawGameScreen() {
+            // draw background.png
+            ctx.drawImage(bgImage, 0, -20);
+            // draw kitchen.png            
+            ctx.drawImage(kitchenImg, 0, 0);
+            // if incredient is active, draw white box and fade out
+            incredients.forEach(function(incredient) {
+                if(incredient.button.activeCountDown > 0) {
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillRect(incredient.button.x, incredient.button.y, incredient.button.width, incredient.button.height);
+                    incredient.button.activeCountDown -= 1;
+                }
+            });           
+
+                  
+            // draw each of the orders in the orders in the array in the box
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "9px Arial";
+            ctx.fillText("Orders:", 186, 240);
+            orders.forEach(function(order, index) {
+                const orderTx = '$' + order.cost + ' ' + order.name + ' (' + order.incredients.join(' ') + ')'                
+                if( typeof orders[0].removeCountDown === 'undefined' ) {
+                    ctx.fillText(orderTx, 186, 250 + index * 11)
+                } else {   
+                    if(orders[0].success) {
+                        ctx.fillStyle = "#00ff00";
+                    } else {
+                        ctx.fillStyle = "#ff0000";
+                    }                 
+                    ctx.fillText(orderTx, 186, 250 + (index * 11) + (orders[0].removeCountDown-20))
+                    orders[0].removeCountDown -= 1;
+                    if(orders[0].removeCountDown < 0) {
+                        orders.shift();
+                    }
+                }
+            });            
+            if(orders.length == 0) {
+                ctx.fillText("No orders", 186, 250);
+            }
+            // check if there are more than 4 customers
+            if(customers.length > 2 && !updatedMusic) {
+                updatedMusic = true;
+                // update background music to panickedbackgroundmusic.mp3
+                backgroundMusic.src = 'panickedbackgroundmusic.mp3';
+                // play panickedbackgroundmusic.mp3
+                backgroundMusic.play();
+                backgroundMusic.loop = true;
+                // play arguing
+                arguing.play();
+                arguing.loop = true;
+                
+            }
+            // if the customers equal max customers play angrybackgroundmusic.mp3
+            if(customers.length == MAX_CUSTOMERS && !finalMusic) {
+                finalMusic = true;
+                // update background music to angrybackgroundmusic.mp3
+                backgroundMusic.src = 'angrybackgroundmusic.mp3';
+                // play angrybackgroundmusic.mp3
+                backgroundMusic.play();
+                backgroundMusic.loop = true;
+                screaming.play();
+                screaming.loop = true;
+                arguing.pause();
+                fire.play();
+                fire.loop = true;
+
+            }
+        
+            // draw the customer
+            customers.forEach(function(customer, index) {
+                // draw the customer, move them a little to the right each frame
+                customer.x += .5;
+                // if there are max customers, add a random number between 1-5 to x
+                if(customers.length == MAX_CUSTOMERS && riotMode == false) {
+                    customer.x -= Math.floor(Math.random() * 5);
+                }
+                
+                if(customer.x > 330 - (index * 64))  {
+                    customer.x = 330 - (index * 64);             
+                } 
+                            
+                if(customer.order == undefined) {
+                    customer.order = possibleOrders[Math.floor(Math.random() * possibleOrders.length)];
+                    // add a clonse of the customer order to orders array
+                    orders.push(JSON.parse(JSON.stringify(customer.order)));
+                }    
+                
+                // draw a 50x75 white rectangle for the customer
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(customer.x, 70, 60, 75);
+                // draw the customer name
+                ctx.fillStyle = "#000000";
+                ctx.font = "9px Arial";
+                ctx.fillText(customer.name, customer.x + 2, 80);
+                // draw the customer order
+                ctx.fillText(customer.order.name, customer.x + 2, 100);
+                // draw a filled in white cricle above the square
+                ctx.beginPath();
+                ctx.arc(customer.x + 30, 40, 30, 0, 2 * Math.PI);
+                ctx.fillStyle = "#ffffff";
+                ctx.fill();                
+                if(customer.x >= 330 - (index * 64) || riotMode == true)  {
+                    // draw angry face
+                    ctx.drawImage(angryFaces[customer.angryFace], customer.x, 20);
+                } else {
+                    // draw happy face
+                    ctx.drawImage(happyFaces[customer.happyFace], customer.x, 20);
+                }
+                if (riotMode){                    
+                    // randomly choose to draw a pitchfork or torch
+                    if (typeof customer.wepon == "undefined"){
+                        customer.wepon = Math.floor(Math.random() * 2);
+                    }
+                    
+                    if (customer.wepon == 1){
+                        // draw pitchfork                        
+                        ctx.drawImage(pitchforkImg, customer.x-5, 20);
+                    } else {
+                        // draw torch
+                        ctx.drawImage(torchImg, customer.x-5, 20);
+                    }
+                }
+
+            });
+            /// Ccheck if all customers are off screen, negative x is off screen
+            let allCustomersOffScreen = true;
+            customers.forEach(function(customer) {
+                if(customer.x > 0) {
+                    allCustomersOffScreen = false;
+                }
+            });
+            if (MAX_CUSTOMERS == customers.length && allCustomersOffScreen && riotMode == false){
+                console.log ("riot mode = true");
+                riotMode = true;
+                setTimeout(function(){ 
+                    gameMode = "gameOver"; 
+                }, 12000);
+            }
+            // draw the bell in right side above the3 grill            
+            ctx.drawImage(bellImg, 310, 120);            
+            
+
+            // draw text of money
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "9px Arial";
+            ctx.fillText("Money: $" + money.toFixed(2), 186, 230);
+            // animate on screen incredient falling from top of screen to base of grill
+            onScreenIncredients.forEach(function(incredient, index) {
+                // draw incredient
+                let img = new Image();
+                img.src = incredient.src;   
+                // if .x and .y are not defined, set them to top of screen
+                if(incredient.x == undefined) {
+                    incredient.x = 220 + Math.floor(Math.random() * 8);
+                }
+                if(incredient.y == undefined) {
+                    incredient.y = 0;
+                }
+                ctx.drawImage(img, incredient.x, incredient.y);
+                // if unset add velcoity = .1
+                if(incredient.velocity == undefined) {
+                    incredient.velocity = 0.1;
+                } else {
+                    // if set increase velocity by .1
+                    incredient.velocity += 0.1;
+                }
+                // move y position by velocity
+                incredient.y += incredient.velocity;
+
+                // if incredient hits base of grill stop falling, subtract vertical space for each onScreenIncredient
+                if(incredient.y > grill.y - index * 4) {
+                    incredient.y = grill.y -  index * 4;                   
+                }
+            });                       
+            // draw how busy we are in upper right base on rate of new customers in green, yellow, red
+            // text light, heavy, very heavy
+            if( new Date() - orginalStartTime < 30000) {
+                ctx.fillStyle = "#00ff00";
+                // draw text
+                ctx.fillText("Light traffic", 350, 20);
+            } else if( new Date() - orginalStartTime < 60000) {
+                ctx.fillStyle = "#ffff00";
+                // draw text
+                ctx.fillText("Heavy", 350, 20);
+            } else {
+                ctx.fillStyle = "#ff0000";
+                // draw text
+                ctx.fillText("Very Heavy", 350, 20);
+            }
+            if( riotMode == true){
+                // show the dom firecontainer div height                 
+                playGift();
+            }
+        }
+        
+        function drawGame() {
+           switch(gameMode){
+            case "titleScreen":
+                displayTitleScreen();
+            break;
+            case "game":
+                drawGameScreen();
+           }       
+        }
+        let orginalStartTime = new Date();
+        let rateOfNewCustomers = 1000;
+  
+        function addCUsomterIfTime() {
+            // after 30s increase rate of new customers
+            if( new Date() - orginalStartTime > 30000) {
+                rateOfNewCustomers = 5000;
+            }
+            // after 60s increase rate of new customers
+            if( new Date() - orginalStartTime > 60000) {
+                rateOfNewCustomers = 3000;
+            }
+            // add a customer every 10 seconds
+            if( new Date() - lastCustomerAddTime > rateOfNewCustomers) {
+                let custIndex = Math.floor(Math.random() * customerNames.length);
+                // get a name that is not already in the customers array
+                var name = customerNames[Math.floor(Math.random() * customerNames.length)];
+                customers.forEach(function(customer) {
+                    if(customer.name == name) {
+                        name = customerNames[Math.floor(Math.random() * customerNames.length)];
+                    }
+                });
+                // only add if there are less than 5 customers
+                if(customers.length >= MAX_CUSTOMERS) {
+                    return;
+                }
+                // add a customer
+                customers.push({
+                    // random names clone
+                    name,                    
+                    x: 0,
+                    angryFace: Math.floor(Math.random() * angryFaces.length),
+                    happyFace: Math.floor(Math.random() * happyFaces.length),                                        
+                });
+                console.log("add customer, total customers: " + customers.length);
+                // reset gameStartTime
+                lastCustomerAddTime = new Date();
+            }         
+        }
+        const frames = [];
+        const delays = [];
+        function playGif() {
+            let frameIndex = 0;
+            const nextFrame = () => {
+            if (frames.length > 0) {
+                ctx.putImageData(frames[frameIndex], 200, 200);
+                frameIndex = (frameIndex + 1) % frames.length;
+                setTimeout(nextFrame, delays[frameIndex]);
+            }
+            };
+            nextFrame();
+        }
+        // Load the GIF
+        fetch('fire.gif')
+            .then(response => response.arrayBuffer())
+            .then(buffer => {
+            const gifReader = new GifReader(new Uint8Array(buffer));
+            for (let i = 0, numFrames = gifReader.numFrames(); i < numFrames; i++) {
+                const frameInfo = gifReader.frameInfo(i);
+                const imageData = ctx.createImageData(frameInfo.width, frameInfo.height);
+                gifReader.decodeAndBlitFrameRGBA(i, imageData.data);
+                frames.push(imageData);
+                delays.push(frameInfo.delay * 10); // GifReader returns delay in 10ths of a sec
+            }
+        })
+        .catch(console.error);
+
+        function main() {            
+            // clear the canvas
+            ctx.fillStyle = "#000000";
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (gameMode == "gameOver"){
+                // draw game over image:
+                var img = new Image();
+                img.src = "gameover.png";
+                ctx.drawImage(img, 0, 0);         
+                // draw black text version on top     
+            } else {       
+                // every ten seconds add a customer
+                if (gameMode == "game"){
+                    addCUsomterIfTime();
+                }
+                drawGame();
+            }
+            requestAnimationFrame(main);
+        };
+        var backgroundMusic = new Audio('happybackgroundmusic.mp3');
+        // bind click event to canvas
+        canvas.addEventListener("click", function(event) {
+            // get the x and y coordinates of the mouse relative to the canvas
+            var rect = canvas.getBoundingClientRect();
+            var mouseX = event.clientX - rect.left;
+            var mouseY = event.clientY - rect.top;
+            // adjust the mouse coordinates to account for canvas size
+            mouseX = Math.floor(mouseX * (canvas.width / rect.width));
+            mouseY = Math.floor(mouseY * (canvas.height / rect.height));
+            // log the mouse coordinates
+            console.log("x: " + mouseX + ", y: " + mouseY);
+            switch(gameMode){
+                case "titleScreen":
+                    gameMode = 'game';
+                    // play happybackgroundmusic.mp3
+                    backgroundMusic.play();
+                    backgroundMusic.loop = true;
+                    lastCustomerAddTime = new Date();
+                    orginalStartTime = new Date();
+
+                break;
+                case "gameOver":
+                    location.reload();
+                    break;
+                case "game":
+                    // log what incredient was clicked     
+                    incredients.forEach(function(incredient) {
+                        if(mouseX > incredient.button.x && mouseX < incredient.button.x + incredient.button.width && mouseY > incredient.button.y && mouseY < incredient.button.y + incredient.button.height) {
+                            console.log(incredient.name + " clicked");
+                            // add incredient to onScreenIncredients clone
+                            onScreenIncredients.push(JSON.parse(JSON.stringify(incredient)));
+                            // activate incredient button
+                            incredient.button.activeCountDown = 5;
+                            // play register.mp3
+                            var audio = new Audio('register.mp3');
+                            audio.play();
+                            // subtract incredient cost from money
+                            money -= incredient.cost;
+                        }
+                    });      
+                    // check if the bell was clicked
+                    if( mouseX > 310 && mouseX < 310 + 40 && mouseY > 120 && mouseY < 120 + 80) {
+                        console.log("bell clicked");                        
+                        const insideIncredients = onScreenIncredients.slice(1, onScreenIncredients.length-1);
+                        
+                        // check if there are the right number of incredients on the grill
+                        if( orders.length == 0 || insideIncredients.length != orders[0].incredients.length) {
+                            orderFailure();
+                            return;
+                        };
+                        // check we have buns on top and bottom
+                        if( onScreenIncredients[0].name != 'B' || onScreenIncredients[onScreenIncredients.length-1].name != 'TB') {
+                            orderFailure();
+                            return;
+                        }
+                        
+                        // check if the incredients on the grill match the order
+                        for(var i = 0; i < orders[0].incredients.length; i++) {
+                            if(orders[0].incredients[i] != insideIncredients[i].name) {
+                                orderFailure();
+                                return;
+                            }
+                        }
+                        orderSuccess();  
+                    }
+                    if (mouseX > 295 && mouseY > 270){
+                        onScreenIncredients = [];
+                        // play empty.mp3
+                        var audio = new Audio('empty.mp3');
+                        audio.play();
+                    }
+                break;
+            }                                    
+        });
+        function orderSuccess() {
+            // play bell.mp3
+            var audio = new Audio('bell.mp3');
+            audio.play();
+            // add money to money
+            money += orders[0].cost;
+            // set the order to be removed countdown
+            orders[0].removeCountDown = 20;      
+            // note it as success
+            orders[0].success = true;       
+            //clear the grill
+            onScreenIncredients = [];       
+            // remove the customer
+            customers.shift();
+        }
+        function orderFailure() {
+            // play buzzer.mp3
+            var audio = new Audio('buzzer.mp3');
+            audio.play();
+            //clear the grill
+            onScreenIncredients = [];
+            if( orders.length == 0 ) {
+                // just subtract $1
+                money -= 1;
+                return;
+            }
+            // subtract money from money
+            money -= orders[0].cost;
+            // set the order to be removed countdown
+            orders[0].removeCountDown = 20;      
+            // note it as failure
+            orders[0].success = false;
+      
+        }
+        var titleImg = new Image();
+        titleImg.src = "startscreen.png";
+        function displayTitleScreen() {                          
+            // draw startscreen image as background 
+            ctx.drawImage(titleImg, 0, 0);            
+            ctx.fillStyle = "#000";
+            ctx.font = "30px Arial";
+            ctx.fillText("Minimum Wage Sim", titleScreenX, 50);
+            ctx.font = "20px Arial";
+            ctx.fillText("Click to Start", titleScreenX, 100);            
+            // draw black text version on top
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "30px Arial";
+            ctx.fillText("Minimum Wage Sim", titleScreenX-2, 49);
+            ctx.font = "20px Arial";
+            ctx.fillText("Click to Start", titleScreenX-2, 99);
+            // move text
+            titleScreenX -= 3;
+            if(titleScreenX <-250) {
+                titleScreenX = 400;
+            }
+        }
+        main()
+    </script>
+</body>
+</html>

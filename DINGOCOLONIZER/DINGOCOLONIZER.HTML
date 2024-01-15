@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Scrolling Canvas</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" width="400" height="400"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        img.src = 'background.png'; // Replace with the path to your image
+       
+        let scrollX = 0;
+        const scrollSpeed = 2;
+        const edgeMargin = 20;
+        let mouseX = 0;
+        let isMouseOnCanvas = false;
+        let houseSelected = false;
+
+        function drawHouseMenu() {
+            // draw houselv1.png in lower left corner of the canvas           
+            let houselv1 = new Image();
+            houselv1.src = 'houselv1.png';
+            ctx.drawImage(houselv1, 0, canvas.height-houselv1.height, houselv1.width, houselv1.height);
+            // bind when you click the house its highlighted white border:
+            canvas.addEventListener('click', function(event) {
+                let rect = canvas.getBoundingClientRect();
+                let x = event.clientX - rect.left;
+                let y = event.clientY - rect.top;
+                console.log("x: " + x + " y: " + y);    
+                if (x >= 0 && x <= houselv1.width && y >= canvas.height-houselv1.height && y <= canvas.height) {
+                   houseSelected = 'houselv1';
+                }
+            });
+        }
+        function drawSelectedHouseAtMousePosition() {
+            if( houseSelected == false || isMouseOnCanvas == false ) {
+                return;
+            }
+            let house = new Image();
+            house.src = houseSelected + '.png';
+            // draw 50% opacity house at mouse position
+            ctx.globalAlpha = 0.5;
+            ctx.drawImage(house, mouseX, mouseY, house.width, house.height);
+            ctx.globalAlpha = 1.0;            
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, -scrollX, 0, img.width, img.height, 0, 0, img.width, canvas.height);
+            drawHouseMenu()
+            drawSelectedHouseAtMousePosition();
+        }
+
+        function updateScroll() {
+            const maxScroll = img.width - canvas.width;            
+            if (isMouseOnCanvas) {                
+                if (mouseX < edgeMargin && scrollX < 0) {
+                    scrollX += scrollSpeed;
+                }
+                if ((canvas.width - mouseX) < edgeMargin && scrollX > -maxScroll) {
+                    scrollX -= scrollSpeed;
+                }   
+            }
+
+            draw();
+            requestAnimationFrame(updateScroll);
+        }
+
+        img.onload = function() {
+            draw();
+            requestAnimationFrame(updateScroll);
+        };
+
+        canvas.addEventListener('mousemove', function(event) {
+            mouseX = event.offsetX;
+            mouseY = event.offsetY;
+        });
+
+        canvas.addEventListener('mouseenter', function() {
+            isMouseOnCanvas = true;
+        });
+
+        canvas.addEventListener('mouseleave', function() {
+            isMouseOnCanvas = false;
+        });
+    </script>
+</body>
+</html>

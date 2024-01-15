@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stacker Game</title>
+</head>
+<body>
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.style.border = '2px solid black'; // Adding an outline to the canvas
+
+        const blockWidth = 60;
+        const blockHeight = 20;
+        let x = 0;
+        let y = canvas.height - blockHeight;
+        let deltaX = 2; // Speed of the block
+        let stack = [];
+        let gameStarted = false;
+
+        function drawBlock(x, y, width) {
+            ctx.beginPath();
+            ctx.rect(x, y, width, blockHeight);
+            ctx.fillStyle = "#0095DD";
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function addNewBlock() {
+            if (!gameStarted) {
+                gameStarted = true;
+                stack.push({ x: 0, y: canvas.height - blockHeight, width: blockWidth });
+                y -= blockHeight;
+                return;
+            }
+
+            let lastBlock = stack[stack.length - 1];
+            let overlap = Math.min(x + blockWidth, lastBlock.x + lastBlock.width) - Math.max(x, lastBlock.x);
+
+            if (overlap <= 0) {
+                alert("Game Over!");
+                document.location.reload();
+                return;
+            }
+
+            let newX = Math.max(x, lastBlock.x);
+            let newWidth = overlap;
+
+            stack.push({ x: newX, y: y, width: newWidth });
+            y -= blockHeight; // Move up for the next block
+
+            if (newX > lastBlock.x) {
+                drawFallingBlock(lastBlock.x + lastBlock.width, y, blockWidth - overlap);
+            } else if (x < lastBlock.x) {
+                drawFallingBlock(lastBlock.x - (blockWidth - overlap), y, blockWidth - overlap);
+            }
+        }
+
+        function drawFallingBlock(x, y, width) {
+            let fallDistance = 0;
+            const fallSpeed = 5;
+            function fall() {
+                ctx.clearRect(x, y + fallDistance - fallSpeed, width, blockHeight + fallSpeed);
+                fallDistance += fallSpeed;
+                drawBlock(x, y + fallDistance, width);
+                if (y + fallDistance < canvas.height) {
+                    requestAnimationFrame(fall);
+                }
+            }
+            fall();
+        }
+
+        function updateGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            stack.forEach(block => drawBlock(block.x, block.y, block.width));
+
+            if (gameStarted) {
+                let currentWidth = stack[stack.length - 1].width;
+                drawBlock(x, y, currentWidth);
+
+                if (x + deltaX > canvas.width - currentWidth || x + deltaX < 0) {
+                    deltaX = -deltaX;
+                }
+                x += deltaX;
+            }
+
+            requestAnimationFrame(updateGame);
+        }
+
+        canvas.addEventListener('click', function() {
+            addNewBlock();
+        });
+
+        updateGame();
+
+
+    </script>
+</body>
+</html>
