@@ -1,0 +1,374 @@
+<canvas id="myCanvas" width="400" height="400"></canvas>
+
+<script>
+    const canvas = document.getElementById("myCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const backgroundImage = new Image();
+    backgroundImage.src = "background.png";
+
+    backgroundImage.onload = function () {
+        ctx.drawImage(backgroundImage, 0, 0);
+    };
+    const playerImage = new Image();
+    playerImage.src = "player.png";
+    const player = {
+        x: 200,
+        y: 200,
+        tileX: 3,
+        tileY: 3,
+        width: 80,
+        height: 80,
+        angle: 0,        
+    };
+    const vanimage = new Image();
+    vanimage.src = "van.png";
+    const van = {
+        x: 0,
+        y: 0,
+    };
+    const entranceimage = new Image();
+    entranceimage.src = "entrance.png";
+    const entrance = {
+        x: 300,
+        y: 0,
+    };
+    const doorEntrance = {
+        x: 330,
+        y: 170,
+        w: 60,
+        h: 60,
+    };
+    var gameMode = "tomb"
+   
+
+    // point the player in the direction of the mouse position
+    canvas.addEventListener("mousemove", (event) => {
+        const mousePosition = {
+            x: event.clientX,
+            y: event.clientY,
+        };
+        if(gameMode == "outside"){
+            player.angle = Math.atan2(
+                mousePosition.y - player.y,
+                mousePosition.x - player.x
+
+            );
+        } else {
+            player.angle = Math.atan2(
+                mousePosition.y - 200,
+                mousePosition.x - 200
+                
+            )
+        }
+    });
+    var arrowdown = false;
+    // bind up the arrow keys to move the player is facing in the direction that he is facing
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "ArrowUp") {
+            arrowdown = true;
+        }
+    });
+    document.addEventListener("keyup", (event) => {
+        if (event.key === "ArrowUp") {
+            arrowdown = false;
+        }
+    });
+    const tipArray = [
+        'monsters dont like hugs',
+        'collect loot from chests',
+        'you can only carry 5 items',
+        'monsters dont like eating bullet lead',
+        'furries are evil',
+        'border.radius is the worst css property ever',
+    ]
+    const checkforOutsideCollisions =() =>{        
+        // check for collision with 20 pixels into the doorEntrance
+        if (
+            player.x < doorEntrance.x + doorEntrance.w + 20 &&
+            player.x + playerImage.width > doorEntrance.x - 20 &&
+            player.y < doorEntrance.y + doorEntrance.h + 20 &&
+            player.y + playerImage.height > doorEntrance.y - 20
+        ) {
+            console.log("door collision");                
+            // stop the player from moving
+            player.x -= Math.cos(player.angle) * 4;
+            player.y -= Math.sin(player.angle) * 4;            
+            fadeoutCallback(()=>{
+                gameMode = "loading-screen";
+                player.x = 200;
+                player.y = 200;           
+                // show loding screen for 4 seconds
+                setTimeout(()=>{
+                    player.x = 2
+                    player.y = 2
+                    gameMode = "tomb";
+                }, 4000);         
+            })
+        }           
+
+        // check if the player is going out of bounds
+        if (player.x < 0 || player.x > canvas.width-80 || player.y < 0 || player.y > canvas.height) {
+            // stop the player from moving
+            player.x -= Math.cos(player.angle) * 4;
+            player.y -= Math.sin(player.angle) * 4;
+            console.log("out of bounds");
+        }           
+
+        // check for collision with the van
+        if (
+            player.x < van.x + vanimage.width &&
+            player.x + playerImage.width > van.x &&
+            player.y < van.y + vanimage.height &&
+            player.y + playerImage.height > van.y
+        ) {
+            // stop the player from moving
+            player.x -= Math.cos(player.angle) * 4;
+            player.y -= Math.sin(player.angle) * 4;
+
+        }
+    }
+    // 1 - wall 
+    // 2 - door 
+    // 3 - chest 
+    // 4 - monster
+    const rooms = [
+        [
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 4, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 4, 0, 1, 0, 0, 2],
+            [1, 0, 4, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 3, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            [1, 1, 1, 1, 1, 1, 1, 2, 1, 1]
+        ]
+    ]
+    // map consist of 5x5 rooms with hallways connecting them together
+    const map = [];
+    // fill in the map with 0's with 75x75 
+    for(let i = 0; i < 75; i++){
+        map.push([]);
+        for(let j = 0; j < 75; j++){
+            map[i].push(0);
+        }
+    }
+    
+    for(let i = 0; i < 5; i++){        
+        for(let j = 0; j < 5; j++){
+            // pick a random room from the rooms array
+            let room = rooms[Math.floor(Math.random() * rooms.length)];            
+            // map in the 10x10 room to the map grid leaving 5 spaces between each room
+            for(let k = 0; k < 10; k++){
+                for(let l = 0; l < 10; l++){
+                    // if at the edge leave no space between rooms                    
+                    map[(i*10)+k + (i*5) ][ (j*10)+l + (j*5) ] = room[k][l];                    
+                }
+            }                    
+        }        
+    }
+    // look for doors and connect them to the next room
+    for(let i = 0; i < map.length; i++){
+        for(let j = 0; j < map[i].length; j++){
+            // if the current tile is a door
+            if(map[i][j] === 2 && i==0){
+               // no doors at the top
+               map[i][j] = 1
+            }
+            // no doors at the bottom
+            if(map[i][j] === 2 && i==map.length-6){
+                map[i][j] = 1
+            }
+            // no doors to the lef:
+            if(map[i][j] === 2 && j==0){
+                map[i][j] = 1
+            }
+            // no doors to the right
+            if(map[i][j] === 2 && j==map[i].length-6){
+                map[i][j] = 1
+            }
+
+            // if a door is found and empty space is found to the right build a hall
+            if(map[i][j] === 2 && map[i][j+1] === 0){                
+                // build a hall to the right
+                for(let k = 1; k < 6; k++){
+                    map[i-1][j+k] = 1;
+                    map[i+1][j+k] = 1;                    
+                }
+                // add opening to the right
+                map[i][j+6] = 0;
+            }
+            // if a door is found and empty space is found under it build a hall
+            if(map[i][j] === 2 && map[i+1][j] === 0){                
+                // build a hall to the bottom
+                for(let k = 1; k < 7; k++){
+                    map[i+k][j-1] = 1;
+                    map[i+k][j+1] = 1;
+                    map[i+k][j] = 0;
+                }
+            }
+        }
+    }
+    const tileSize = 70;
+
+    const mapSize = 75; // Assuming your map is 75x75 tiles
+    const canvasSize = 400;
+    const viewSize = 30;
+    const halfViewSizeInPixels = (viewSize * tileSize) / 2;  
+    let camera = {
+        x: player.tileX * tileSize,
+        y: player.tileY * tileSize,
+        speed: 1 // The smoothing factor for camera movement
+    };
+    const renderTombAndPlayer = () => {
+        // Clear the canvas before redrawing
+        ctx.clearRect(0, 0, canvasSize, canvasSize);
+
+        // Smoothly update the camera position to follow the player
+        camera.x += (player.x - camera.x) * camera.speed;
+        camera.y += (player.y - camera.y) * camera.speed;
+        console.log("cam:", camera.x, camera.y);
+        console.log("player:", player.x, player.y);
+        // Calculate the top-left corner of the viewport in tile coordinates
+        const topLeftX = Math.max(0, Math.min(mapSize - viewSize, Math.floor(camera.x / tileSize) - Math.floor(viewSize / 2)));
+        const topLeftY = Math.max(0, Math.min(mapSize - viewSize, Math.floor(camera.y / tileSize) - Math.floor(viewSize / 2)));
+
+        // Draw the visible tiles
+        for (let i = 0; i < viewSize; i++) {
+            for (let j = 0; j < viewSize; j++) {
+                const mapX = topLeftX + j;
+                const mapY = topLeftY + i;
+
+                // Check if we are within the map boundaries
+                if(mapY < map.length && mapX < map[mapY].length){
+                    // Choose color based on tile type
+                    switch(map[mapY][mapX]){
+                        case 1: ctx.fillStyle = "gray"; break;
+                        case 2: ctx.fillStyle = "brown"; break;
+                        case 3: ctx.fillStyle = "gold"; break;
+                        case 4: ctx.fillStyle = "red"; break;
+                        default: ctx.fillStyle = "black"; // Empty space
+                    }
+                    // Draw the tile
+                    ctx.fillRect(
+                        (j * tileSize) - (camera.x - topLeftX * tileSize),
+                        (i * tileSize) - (camera.y - topLeftY * tileSize),
+                        tileSize,
+                        tileSize
+                    );
+                }
+            }
+        }
+
+        if (arrowdown === true) {
+            player.x += Math.cos(player.angle) * 4;
+            player.y += Math.sin(player.angle) * 4;          
+        }
+        // draw the plater at the angle
+        ctx.save();
+        ctx.translate(200, 200);
+        ctx.rotate(player.angle);
+        ctx.drawImage(playerImage, -player.width / 4, -player.height / 4, player.width/2, player.height/2);
+        ctx.restore();      
+    };
+
+
+
+
+    const drawPlayer = () => {               
+        if (arrowdown === true) {
+            player.x += Math.cos(player.angle) * 4;
+            player.y += Math.sin(player.angle) * 4;        
+
+            if(gameMode == "outside"){
+                checkforOutsideCollisions();
+            }
+                        
+        }
+        // draw the plater at the angle
+        ctx.save();
+        ctx.translate(player.x, player.y);
+        ctx.rotate(player.angle);
+        ctx.drawImage(playerImage, -player.width / 2, -player.height / 2, player.width, player.height);
+        ctx.restore();        
+    };
+    let fadeInx = 0;
+    let fadeOut = false;
+    const fadeoutCallback = (callback) => {
+        fadeOut = true;
+        const int = setInterval(()=>{
+            if(fadeInx > 1){
+                fadeOut = false;
+                fadeInx = 0;
+                callback();
+                clearInterval(int);
+            }
+        }, 1000/60)        
+    }
+    const drawOutside = () => {
+        ctx.drawImage(backgroundImage, 0, 0);
+        ctx.drawImage(vanimage, van.x, van.y);
+        ctx.drawImage(entranceimage, entrance.x, entrance.y);
+    }
+    let tipIndex = 0;
+    let tipfadeIn = true;
+    let randomTip = Math.floor(Math.random() * tipArray.length); 
+
+    const gameLoop = () => {                
+        // draw black background
+        ctx.fillStyle = "black";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        switch(gameMode){
+            case "outside":                        
+                //renderTombAndPlayer();        
+                drawOutside();
+                drawPlayer();
+                break;
+            case "loading-screen":
+                ctx.fillStyle = "rgba(0,0,0,0.5)";
+                ctx.fillRect(0,0,canvas.width,canvas.height);
+                ctx.fillStyle = "white";
+                ctx.font = "30px Arial";
+                ctx.fillText("loading", 148, 200);
+                // fade in the tipIndex
+                ctx.fillStyle = "rgba(0,255,20,"+tipIndex+")";
+                ctx.font = "20px Arial";
+                // draw a random tip center it based on the text length
+                ctx.fillText(tipArray[randomTip], 200 - (tipArray[randomTip].length * 4.4), 250);
+                if (tipfadeIn === true) {
+                    tipIndex += 0.01;
+                    if (tipIndex > 1) {
+                        tipfadeIn = false;
+                    }
+                } else {
+                    tipIndex -= 0.01;
+                    if (tipIndex < 0) {
+                        tipfadeIn = true;
+                        // get a new random tip but not the same one
+                        let newRandomTip = Math.floor(Math.random() * tipArray.length);
+                        while (newRandomTip === randomTip) {
+                            newRandomTip = Math.floor(Math.random() * tipArray.length);
+                        }
+                        randomTip = newRandomTip;
+                    }
+                }
+               
+                break;
+            case "tomb":
+                renderTombAndPlayer();                
+                break;            
+        }     
+        
+        if(fadeOut === true){
+            ctx.fillStyle = "rgba(0,0,0,"+fadeInx+")";
+            ctx.fillRect(0,0,canvas.width,canvas.height);
+            fadeInx += 0.01;
+        }
+
+        requestAnimationFrame(gameLoop);
+
+    };
+    gameLoop();
+</script>
