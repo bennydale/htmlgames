@@ -1,6 +1,20 @@
 <canvas id="myCanvas" width="400" height="400"></canvas>
 
 <script>
+    /*
+████████╗ ██████╗ ███╗   ███╗██████╗    ███████╗███████╗   ██║    ██║  █████╗ ██████╗ ███████╗██████╗ 
+╚══██╔══╝██╔═══██╗████╗ ████║██╔══██╗     ██║   ██║   ██║  ██║    ██║  ██╔══██╗██╔══██╗██╔════╝██╔══██╗
+   ██║   ██║   ██║██╔████╔██║██████╔╝      ██║    ██║   ██║  ██║    ██║ ███████║██║  ██║█████╗  ██████╔╝
+   ██║   ██║   ██║██║╚██╔╝██║██╔══██╗      ██║    ██║   ██║  ██║    ██║ ██╔══██║██║  ██║██╔══╝  ██╔══██╗
+   ██║   ╚██████╔╝██║ ╚═╝ ██║██║████║    ███████╗ ╝██║  ██║  ███    ██║ ██╝  ██  ███████╗██████║██   ██   **A Play Vista Production**
+   ╚═╝    ╚═════╝ ╚═╝     ╚═╝╚══════╝    ╚══════╝ ╚═════╝     ╚═████═══╝ ╚═╝  ╚═╝╚═════╝ ╚══════╝╚═╝  ╚═╝ **2024**   
+   play this at play-vista.com 
+   // game by anthony dale castro
+   // thx to my dad for helping me with most of the code
+   // music from aztech challenge 1983 commodore 64
+   // i stole all of the sound effects
+   // i stole stock images and made the lowest quality graphics known to man
+   */
     const canvas = document.getElementById("myCanvas");
     const ctx = canvas.getContext("2d");
 
@@ -10,6 +24,7 @@
     backgroundImage.onload = function () {
         ctx.drawImage(backgroundImage, 0, 0);
     };
+
     const playerImage = new Image();
     playerImage.src = "player.png";
     const player = {
@@ -39,9 +54,7 @@
         w: 60,
         h: 60,
     };
-    var gameMode = "tomb"
-   
-
+    var gameMode = "outside"; // outside, tomb, loading-screen    
     // point the player in the direction of the mouse position
     canvas.addEventListener("mousemove", (event) => {
         const mousePosition = {
@@ -60,6 +73,7 @@
                 mousePosition.x - 200
                 
             )
+           // console.log("player.angle:", player.angle, "mousePosition.x:", mousePosition.x, "mousePosition.y:", mousePosition.y, "player.x:", player.x, "player.y:", player.y);
         }
     });
     var arrowdown = false;
@@ -100,8 +114,8 @@
                 player.y = 200;           
                 // show loding screen for 4 seconds
                 setTimeout(()=>{
-                    player.x = 2
-                    player.y = 2
+                    player.x = 200
+                    player.y = 200
                     gameMode = "tomb";
                 }, 4000);         
             })
@@ -222,9 +236,40 @@
         y: player.tileY * tileSize,
         speed: 1 // The smoothing factor for camera movement
     };
+
+    // Pre-load images
+    var loadedImages = {};
+    var imageSources = {
+        1: 'ground.jpg',
+        2: 'bricks.jpg',        
+        3: 'coins.png',
+        4: 'entrance.png'
+    };
+
+    function loadImages(sources, callback) {
+        var loadedImagesCount = 0;
+        var totalImages = Object.keys(sources).length;
+        
+        for(var index in sources) {
+            loadedImages[index] = new Image();
+            loadedImages[index].onload = function() {
+                if(++loadedImagesCount >= totalImages) {
+                    callback(loadedImages);
+                }
+            };
+            loadedImages[index].src = sources[index];
+        }
+    }
+
+    // Call this function and pass a callback function that starts your game loop
+    loadImages(imageSources, function(loadedImages) {
+        // Images are all loaded
+        // Start your game loop here
+    });
+
     const renderTombAndPlayer = () => {
-        // Clear the canvas before redrawing
-        ctx.clearRect(0, 0, canvasSize, canvasSize);
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, canvasSize, canvasSize);
 
         // Smoothly update the camera position to follow the player
         camera.x += (player.x - camera.x) * camera.speed;
@@ -243,31 +288,70 @@
 
                 // Check if we are within the map boundaries
                 if(mapY < map.length && mapX < map[mapY].length){
+                    //console.log("mapX:", mapX, "mapY:", map, "map[mapY][mapX]:", map[mapY][mapX]);
                     // Choose color based on tile type
                     switch(map[mapY][mapX]){
-                        case 1: ctx.fillStyle = "gray"; break;
-                        case 2: ctx.fillStyle = "brown"; break;
-                        case 3: ctx.fillStyle = "gold"; break;
-                        case 4: ctx.fillStyle = "red"; break;
-                        default: ctx.fillStyle = "black"; // Empty space
+                        case 1: img = loadedImages[2]; break;
+                        case 2: img = loadedImages[4]; break;
+                        case 3: img = loadedImages[3]; break;                    
+                        default:
+                            img = loadedImages[1]; break;
                     }
-                    // Draw the tile
-                    ctx.fillRect(
-                        (j * tileSize) - (camera.x - topLeftX * tileSize),
-                        (i * tileSize) - (camera.y - topLeftY * tileSize),
-                        tileSize,
-                        tileSize
-                    );
+                }
+                ctx.globalAlpha = 0.5;
+                ctx.drawImage(
+                    img,
+                    (j * tileSize) - (camera.x - topLeftX * tileSize),
+                    (i * tileSize) - (camera.y - topLeftY * tileSize),
+                    tileSize,
+                    tileSize
+                );
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        if (arrowdown === true) {            
+            // Calculate the player's new position
+            var newX = (player.x) + Math.cos(player.angle) * 4;
+            var newY = (player.y) + Math.sin(player.angle) * 4;
+
+            // Convert player's new position to map tile coordinates
+            var newTileX = Math.floor((newX+200) / tileSize);
+            var newTileY = Math.floor((newY+200) / tileSize);
+
+            // Function to check if a tile is walkable
+            function isWalkable(x, y) {
+                return map[y] && map[y][x] !== 1;
+            }
+
+            // Initial collision check
+            if (isWalkable(newTileX, newTileY)) {
+                // No collision, update player's position
+                player.x = newX;
+                player.y = newY;
+            } else {
+                // Attempt to slide along the wall if direct movement is blocked
+                var slideX = player.x, slideY = player.y;
+
+                // Check for potential horizontal and vertical sliding
+                if (isWalkable(Math.floor(player.x / tileSize), newTileY)) {
+                    slideY = newY; // Slide vertically
+                }
+                if (isWalkable(newTileX, Math.floor(player.y / tileSize))) {
+                    slideX = newX; // Slide horizontally
+                }
+
+                // Update player's position to the new sliding position if different
+                if (slideX !== player.x || slideY !== player.y) {
+                    player.x = slideX;
+                    player.y = slideY;
                 }
             }
         }
 
-        if (arrowdown === true) {
-            player.x += Math.cos(player.angle) * 4;
-            player.y += Math.sin(player.angle) * 4;          
-        }
         // draw the plater at the angle
-        ctx.save();
+        ctx.save();    
+
         ctx.translate(200, 200);
         ctx.rotate(player.angle);
         ctx.drawImage(playerImage, -player.width / 4, -player.height / 4, player.width/2, player.height/2);
@@ -319,10 +403,9 @@
     const gameLoop = () => {                
         // draw black background
         ctx.fillStyle = "black";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, canvas.width, canvas.height);        
         switch(gameMode){
-            case "outside":                        
-                //renderTombAndPlayer();        
+            case "outside":                                        
                 drawOutside();
                 drawPlayer();
                 break;
@@ -357,7 +440,7 @@
                
                 break;
             case "tomb":
-                renderTombAndPlayer();                
+                renderTombAndPlayer();
                 break;            
         }     
         
