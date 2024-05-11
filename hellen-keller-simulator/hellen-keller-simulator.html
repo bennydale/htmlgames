@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    #myCanvas {
+      border: 1px solid black;
+      width: 400px;
+      height: 400px;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="myCanvas"></canvas>
+</body>
+<script>
+  var canvas = document.getElementById('myCanvas');
+  var context = canvas.getContext('2d');
+  var ready = false;
+  context.fillStyle = 'black';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  function isHellenKeller() {
+    // make the canvas black
+    context.fillStyle = 'black';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    fetch("/api/games/addScore", {
+      method: "POST",
+      headers: {
+          "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+          userid: localStorage.getItem('userid'),
+          token: localStorage.getItem('token'),
+          game_id: "hellen-keller-simulator",
+          score: -1,                                        
+      })
+    })
+  }
+  function notHellenKeller() {
+    // draw text
+    context.font = '17px impact';
+    context.fillStyle = 'white';
+    context.fillText('welcome to hellen keller simulator', 5, 20);
+    context.font = '13px impact';
+    context.fillStyle = 'green';
+    context.fillText('the most acurite simmulation of being hellen keller', 5, 40);
+    context.fillStyle = 'white';
+    context.fillText('press space/click to start', 5, 60);
+  }
+  function isNearlyHellenKeller() {
+    context.fillStyle = 'black';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.font = '17px impact';
+    context.fillStyle = 'red';
+    context.fillText('WARNING', 110, 20);
+    context.font = '13px impact';
+    context.fillStyle = 'white';
+    context.fillText('this simulation is supper immersive and prolonged', 5, 32);
+    context.fillText('exposure is not recommended as the following can', 5, 44);
+    context.fillText('happen in result: hallucinations, nightmares,', 5, 56);
+    context.fillText('nightterrors, nightsweats, sezures, autisum, bindness,', 5, 68);
+    context.fillText('deafness, death, cringe, edgy jokes, and dark humor.', 5, 80);
+    context.fillText('by starting the simulation you acknowledge the', 5, 110);
+    context.fillText('consequences and side effects that may occur.', 5, 122);
+    context.font = '15px impact';
+    context.fillText('press space to start.', 5, 145);
+  }
+  notHellenKeller();
+  // check for space key
+  document.addEventListener('keydown', function(event) {
+    if (event.keyCode === 32) {
+      if (ready) {
+        isHellenKeller();
+        return;
+      }
+      isNearlyHellenKeller();
+      ready = true;
+    }
+  });
+  // check for mouse click
+  document.addEventListener('click', function() {
+    if (ready) {
+        isHellenKeller();
+        return;
+      }
+      isNearlyHellenKeller();
+      ready = true;
+  });
+</script>
+</html>

@@ -54,7 +54,7 @@
         w: 60,
         h: 60,
     };
-    var gameMode = "outside"; // outside, tomb, loading-screen    
+    var gameMode = "tomb"; // outside, tomb, loading-screen    
     // point the player in the direction of the mouse position
     canvas.addEventListener("mousemove", (event) => {
         const mousePosition = {
@@ -266,7 +266,14 @@
         // Images are all loaded
         // Start your game loop here
     });
-
+    const alphaMap = [];
+    // fill in the map with 0's with 75x75 
+    for(let i = 0; i < 75; i++){
+        alphaMap.push([]);
+        for(let j = 0; j < 75; j++){
+            alphaMap[i].push(0);
+        }
+    }
     const renderTombAndPlayer = () => {
         ctx.fillStyle = 'black';
         ctx.fillRect(0, 0, canvasSize, canvasSize);
@@ -298,7 +305,10 @@
                             img = loadedImages[1]; break;
                     }
                 }
-                ctx.globalAlpha = 0.5;
+               
+              
+
+                ctx.globalAlpha = alphaMap[mapY][mapX];
                 ctx.drawImage(
                     img,
                     (j * tileSize) - (camera.x - topLeftX * tileSize),
@@ -329,6 +339,31 @@
                 // No collision, update player's position
                 player.x = newX;
                 player.y = newY;
+                // update teh tile alpha
+       
+                for (let dy = -2; dy <= 2; dy++) {
+                  for (let dx = -2; dx <= 2; dx++) {
+                    let currentTileX = newTileX + dx;
+                    let currentTileY = newTileY + dy;
+                    if (alphaMap[currentTileY] && alphaMap[currentTileY][currentTileX] !== undefined) {
+                      if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
+                        // Increase alpha for close tiles
+                        if (alphaMap[currentTileY][currentTileX] < 1) {
+                          alphaMap[currentTileY][currentTileX] += 0.01
+                          ;
+                        }
+                      } else {
+                        // Decrease alpha for far tiles
+                        if (alphaMap[currentTileY][currentTileX] > 0) {
+                          alphaMap[currentTileY][currentTileX] -= 0.01;
+                        }
+                      }
+                    }
+                  }
+                }
+                
+
+                
             } else {
                 // Attempt to slide along the wall if direct movement is blocked
                 var slideX = player.x, slideY = player.y;

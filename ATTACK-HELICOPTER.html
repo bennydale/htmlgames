@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Helicopter Game</title>
+    <style>
+        canvas {            
+            transform: translate(-50%, -50%);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            height: 100%;
+        }  
+    </style>
+</head>
+<body>
+    <canvas id="helicopterCanvas" width="400" height="400"></canvas>
+    <script>
+        const canvas = document.getElementById('helicopterCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const helicopterSprite1 = [
+            "0011111110",
+            "0100010000",
+            "1111111110",
+            "0101111101",
+            "0000111110"
+        ];
+        const helicopterSprite2 = [
+            "0000010000",
+            "1010010000",
+            "0111111110",
+            "1011111101",
+            "0000111110"
+        ];
+        const helicopterPixelSize = 4;
+        const helicopter = {
+            x: 50,
+            y: 200,
+            width: helicopterSprite2[0].length * helicopterPixelSize,
+            height: helicopterSprite2.length * helicopterPixelSize,
+            dy: 0,
+            force: 0,
+        };
+
+        let gameMode = 'mainMenu';
+        let isHoldingLift = false;
+        let score = 0;
+        let frameCount = 0;
+
+        const terrainPixelSize = 20;
+        const terrainWidth = Math.ceil(canvas.width / terrainPixelSize) + 1;
+        let gapSize = 15;
+        const maxTerrainHeight = Math.floor(canvas.height / terrainPixelSize) - gapSize;
+        const initialSpeed = 2;
+        let terrainSpeed = initialSpeed;
+        let terrainOffset = 0;
+        const terrainColumns = [];
+        let currentGapPosition = Math.floor(Math.random() * maxTerrainHeight);
+
+        function initializeTerrain() {
+            for (let i = 0; i < terrainWidth; i++) {
+                addNewTerrainColumn();
+            }
+        }
+
+        function addNewTerrainColumn() {
+            terrainColumns.push({ gapStart: currentGapPosition });
+            currentGapPosition = Math.max(1, Math.min(maxTerrainHeight, currentGapPosition + (Math.random() < 0.5 ? -1 : 1)));
+        }
+
+        function drawHelicopter(helicopterSprite) {
+            ctx.fillStyle = 'lime';
+            for (let row = 0; row < helicopterSprite.length; row++) {
+                for (let col = 0; col < helicopterSprite[row].length; col++) {
+                    if (helicopterSprite[row][col] === '1') {
+                        ctx.fillRect(helicopter.x + col * helicopterPixelSize, helicopter.y + row * helicopterPixelSize, helicopterPixelSize, helicopterPixelSize);
+                    }
+                }
+            }
+        }
+
+        function drawTerrain() {
+            ctx.fillStyle = 'lime';
+            terrainColumns.forEach((column, index) => {
+                const xPosition = index * terrainPixelSize - terrainOffset;
+                ctx.fillRect(xPosition, 0, terrainPixelSize, column.gapStart * terrainPixelSize);
+                ctx.fillRect(xPosition, (column.gapStart + gapSize) * terrainPixelSize, terrainPixelSize, canvas.height);
+            });
+        }
+        function mainMenu() {
+          ctx.fillStyle = 'black';
+          ctx.fillRect(0, 0, 400, 400);
+          ctx.fillStyle = 'lime';
+          ctx.font = '38px courier';
+          ctx.fillText("ATTACK HELICOPTER", 10, 100);
+          ctx.font = '29px courier';
+          ctx.fillText("2024 play-vista.com", 10, 130);
+          ctx.font = '20px courier';
+          ctx.fillText("Press any key(or touch) to start", 10, 200);
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                for (let i = 0; i < canvas.height; i += 2) {
+                    ctx.fillRect(0, i, canvas.width, 1);
+                }
+            document.addEventListener('keydown', () => {
+              if (gameMode === 'mainMenu') {
+                gameMode = 'game';
+                gameLoop();
+              }
+            }, { once: true });
+
+            document.addEventListener('mousedown', () => {
+              if (gameMode === 'mainMenu') {
+                gameMode = 'game';
+                gameLoop();
+              }
+            }, { once: true });
+
+            document.addEventListener('touchstart', () => {
+            isHoldingLift = true;
+            });
+
+            document.addEventListener('touchend', () => {
+            isHoldingLift = false;
+            });
+        }
+
+        function updateTerrain() {
+            terrainOffset += terrainSpeed;
+            if (terrainOffset >= terrainPixelSize) {
+                terrainOffset = 0;
+                terrainColumns.shift();
+                addNewTerrainColumn();
+                increaseDifficulty();
+            }
+        }
+        function updateHelicopter() {
+          if (isHoldingLift) {
+            helicopter.force = -1.5;
+          } else {
+            helicopter.force += 0.1;
+          }
+          helicopter.dy = Math.max(helicopter.force, helicopter.dy + helicopter.force);
+          
+          // Terminal velocity
+          const terminalVelocity = 5;
+          helicopter.dy = Math.min(helicopter.dy, terminalVelocity);
+          
+          helicopter.y += helicopter.dy;
+
+          if (helicopter.y < 0) {
+            helicopter.y = 0;
+            helicopter.dy = 0;
+          } else if (helicopter.y + helicopter.height > canvas.height) {
+            helicopter.y = canvas.height - helicopter.height;
+            helicopter.dy = 0;
+          }
+          checkCollision();
+        }
+
+        function increaseDifficulty() {
+            score++;
+            
+            if (score % 50 === 0) {
+                terrainSpeed += 0.1;
+                gapSize = Math.max(5, gapSize - 1);
+            }
+        }
+        // make the isGameOver function
+        function isGameOver() {
+            const heliBottom = helicopter.y + helicopter.height;
+            const heliTop = helicopter.y;
+            return heliBottom > canvas.height || heliTop < 0;
+        }
+        function checkCollision() {
+            const heliBottom = helicopter.y + helicopter.height;
+            const heliTop = helicopter.y;
+            const column = terrainColumns[1]; // Checking against the second column
+            const gapTop = column.gapStart * terrainPixelSize;
+            const gapBottom = (column.gapStart + gapSize) * terrainPixelSize;
+
+            if (heliBottom > gapBottom || heliTop < gapTop) {
+          endGame();
+            }
+        }
+        function gameOver() {
+          ctx.fillStyle = 'black';
+          ctx.fillRect(0, 0, 400, 400);
+          gameMode = 'gameOver';
+          ctx.fillStyle = 'black';
+          ctx.fillRect(0, 0, 400, 400);
+          ctx.fillStyle = 'lime';
+          ctx.font = '40px courier';
+          ctx.fillText("Game Over", 10, 100);
+          ctx.font = '19px courier';
+          ctx.fillText("Score: " + score, 10, 200);
+          ctx.fillText("Press any key(or touch) to restart", 10, 250);
+
+          if (isGameOver()) {
+            gameStarted = false;
+            drawGameOver();
+
+            if (addedScore == false) {
+              addedScore = true;
+              fetch("/api/games/addScore", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                  userid: localStorage.getItem('userid'),
+                  token: localStorage.getItem('token'),
+                  game_id: "the-helicopter-game",
+                  score: score
+                })
+              })
+              .then(response => response.json())
+              .then(data => {
+                console.log(data);
+                // call "refresh scores on outer page"
+                try {
+                  window.parent.refreshScores();
+                } catch (e) {
+                  console.log(e);
+                }
+              })
+              .catch(error => {
+                console.log(error);
+              });
+            }
+            return;
+          }
+
+          document.addEventListener('keydown', () => {
+            if (gameMode === 'gameOver') {
+              resetGame();
+            }
+            
+          }, { once: true });
+
+          document.addEventListener('mousedown', () => {
+            if (gameMode === 'gameOver') {
+              resetGame();
+            }
+          }, { once: true });
+
+          document.addEventListener('touchstart', () => {
+            if (gameMode === 'gameOver') {
+              resetGame();
+            }
+          }, { once: true });
+
+          document.addEventListener('touchend', () => {
+            if (gameMode === 'gameOver') {
+              resetGame();
+            }
+          }, { once: true });
+        }
+         
+        
+          
+        
+        function endGame() {
+          gameOver();
+        }
+
+        function resetGame() {
+            isGameRunning = true;
+            // Reset all game variables
+            gameMode = 'game';
+
+            score = 0;
+            gapSize = 15;
+            terrainSpeed = initialSpeed;
+            helicopter.y = 200;
+            helicopter.dy = 0;
+            helicopter.acceleration = 0;
+            terrainColumns.length = 0;
+            initializeTerrain();
+            gameLoop();
+        }
+
+        function gameLoop() {
+            if (gameMode === 'mainMenu') {
+                mainMenu();
+            }
+            if (gameMode === 'game'){
+                frameCount++;
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, 400, 400);
+                drawTerrain();
+                if (frameCount % 10 < 5) {
+                    drawHelicopter(helicopterSprite1);
+                } else {
+                    drawHelicopter(helicopterSprite2);
+                }
+                
+
+                updateHelicopter();
+                updateTerrain();
+                
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, 125, 20);
+                ctx.fillRect(210, 0, 210, 20);
+                ctx.fillRect(20, 380, 360, 20);
+                ctx.fillStyle = 'lime';
+                ctx.font = '16px courier';
+                ctx.fillText('Score:' + score, 3, 13);
+                ctx.fillText("ATTACK HELICOPTER", 211, 13);
+                ctx.font = '14px courier';
+                ctx.fillText("see more games like this at play-vista.com", 21, 394);
+                // make a crt scanline effect
+                if (frameCount % 6 === 0) {
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                    ctx.fillRect(0, 0, 400, 400);
+                }
+                // make scanline effect
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                for (let i = 0; i < canvas.height; i += 2) {
+                    ctx.fillRect(0, i, canvas.width, 1);
+                }
+                
+                requestAnimationFrame(gameLoop);
+
+            }
+        }
+
+        document.addEventListener('keydown', (event) => { if (event.key === ' ') isHoldingLift = true; });
+        document.addEventListener('keyup', (event) => { if (event.key === ' ') isHoldingLift = false; });
+        canvas.addEventListener('mousedown', () => isHoldingLift = true);
+        canvas.addEventListener('mouseup', () => isHoldingLift = false);
+
+        initializeTerrain();
+        gameLoop();
+    </script>
+</body>
+</html>
