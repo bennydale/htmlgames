@@ -1,0 +1,69 @@
+<html><head><base href="https://playvista2000.io/" />
+<title>Play Vista 2000</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+<style>
+  body {
+    font-family: 'Press Start 2P', cursive;
+    background-color: #000;
+    color: #0f0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+  .screen {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+  }
+  .title {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    animation: blink 1s infinite;
+  }
+  @keyframes blink {
+    0%, 100% { color: #0f0; }
+    50% { color: #070; }
+  }
+  .menu {
+    width: 300px;
+  }
+  .menu-button {
+    background: #0f0;
+    border: 2px solid #070;
+    padding: 0.5rem;
+    margin: 0.5rem 0;
+    color: #000;
+    font-size: 1rem;
+    cursor: pointer;
+    display: block;
+    text-align: center;
+    text-decoration: none;
+    transition: 0.3s;
+  }
+  .menu-button:hover {
+    background: #070;
+    color: #0f0;
+  }
+  .footer {
+    position: absolute;
+    bottom: 0.5rem;
+    font-size: 0.75rem;
+  }
+</style>
+</head>
+<body>
+  <div class="screen">
+    <div class="title">Play Vista 2000</div>
+    <div class="menu">
+      <a href="https://playvista2000.io/launch?app=notepad" class="menu-button">Notepad</a>
+      <a href="https://playvista2000.io/launch?app=calculator" class="menu-button">Calculator</a>
+      <a href="https://playvista2000.io/launch?app=games" class="menu-button">Games Library</a>
+    </div>
+    <div class="footer">© 2000 Play Vista Team</div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conway's Game of Life</title>
+    <style>
+        body { display: flex; justify-content: center; align-items: center; flex-direction: column; height: 100vh; margin: 0; }
+        canvas { border: 1px solid black; margin-bottom: 10px; }
+        .controls { display: flex; justify-content: center; align-items: center; }
+        button, input[type="range"] { margin: 5px; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+    <div class="controls">
+        <button id="startButton">Start</button>
+        <button id="stopButton">Stop</button>
+        <button id="clearButton">Clear</button>
+        <label for="speedSlider">Speed: </label>
+        <input type="range" id="speedSlider" min="1" max="60" value="30">
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const resolution = 10;
+        const cols = canvas.width / resolution;
+        const rows = canvas.height / resolution;
+
+        let grid = createGrid();
+        let animationId = null;
+        let speed = 30;
+        let isRunning = false;
+
+        function createGrid() {
+            return new Array(cols).fill(null)
+                .map(() => new Array(rows).fill(null)
+                .map(() => 0));
+        }
+
+        function drawGrid(grid) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let col = 0; col < grid.length; col++) {
+                for (let row = 0; row < grid[col].length; row++) {
+                    const cell = grid[col][row];
+                    ctx.beginPath();
+                    ctx.rect(col * resolution, row * resolution, resolution, resolution);
+                    ctx.fillStyle = cell ? 'black' : 'white';
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            }
+        }
+
+        function updateGrid(grid) {
+            const nextGrid = grid.map(arr => [...arr]);
+            for (let col = 0; col < grid.length; col++) {
+                for (let row = 0; row < grid[col].length; row++) {
+                    const cell = grid[col][row];
+                    let numNeighbors = 0;
+                    for (let i = -1; i < 2; i++) {
+                        for (let j = -1; j < 2; j++) {
+                            if (i === 0 && j === 0) {
+                                continue;
+                            }
+                            const x = col + i;
+                            const y = row + j;
+                            if (x >= 0 && y >= 0 && x < cols && y < rows) {
+                                numNeighbors += grid[x][y];
+                            }
+                        }
+                    }
+                    if (cell === 1 && numNeighbors < 2) {
+                        nextGrid[col][row] = 0;
+                    } else if (cell === 1 && numNeighbors > 3) {
+                        nextGrid[col][row] = 0;
+                    } else if (cell === 0 && numNeighbors === 3) {
+                        nextGrid[col][row] = 1;
+                    }
+                }
+            }
+            return nextGrid;
+        }
+
+        function update() {
+            if (!isRunning) return;
+            grid = updateGrid(grid);
+            drawGrid(grid);
+            setTimeout(() => {
+                animationId = requestAnimationFrame(update);
+            }, 1000 / speed);
+        }
+
+        function start() {
+            if (!animationId) {
+                isRunning = true;
+                update();
+            }
+        }
+
+        function stop() {
+            isRunning = false;
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+        }
+
+        function clear() {
+            stop();
+            grid = createGrid();
+            drawGrid(grid);
+        }
+
+        function toggleCell(event) {
+            const x = Math.floor(event.offsetX / resolution);
+            const y = Math.floor(event.offsetY / resolution);
+            grid[x][y] = grid[x][y] ? 0 : 1;
+            drawGrid(grid);
+        }
+
+        canvas.addEventListener('click', toggleCell);
+        document.getElementById('startButton').addEventListener('click', start);
+        document.getElementById('stopButton').addEventListener('click', stop);
+        document.getElementById('clearButton').addEventListener('click', clear);
+        document.getElementById('speedSlider').addEventListener('input', (event) => {
+            speed = event.target.value;
+        });
+
+        drawGrid(grid);
+    </script>
+</body>
+</html>

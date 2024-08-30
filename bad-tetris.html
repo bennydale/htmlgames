@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Simple Tetris</title>
+<style>
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    font-family: Arial, sans-serif;
+    background-color: #000;
+  }
+  canvas {
+    background-color: #000;
+  }
+</style>
+</head>
+<body>
+<canvas id="tetris" width="400" height="400"></canvas>
+<script>
+  const canvas = document.getElementById('tetris');
+  const context = canvas.getContext('2d');
+  const scale = 20;  // Each block will be 20x20 pixels
+
+  const rows = 20;
+  const columns = 10;
+
+  let heldPiece = null;
+  let canHold = true;  // Allow holding only once per drop
+
+  let gameState = "menu";  // Initial state is the main menu
+
+  let pieceBag = [];  // Bag of pieces to be drawn next
+  let lastPiece = null;
+
+  const Z = [
+    [1, 1, 0],
+    [0, 1, 1],
+    [0, 0, 0]
+  ];
+  const T = [
+    [0, 1, 0],
+    [1, 1, 1],
+    [0, 0, 0]
+  ];
+  const O = [
+    [1, 1],
+    [1, 1]
+  ];
+  const Z2 = [
+    [0, 1, 1],
+    [1, 1, 0],
+    [0, 0, 0]
+  ];
+  const Crazy = [
+    [0, 0, 0],
+    [0, 0, 0],
+    [1, 1, 1]
+  ];
+
+  const pieces = [
+    [Z, "red"],
+    [Z2, "orange"],
+    [T, "yellow"],
+    [O, "blue"],
+    [Crazy, "magenta"]
+  ];
+
+  let score = 0;
+  let level = 1;
+  let linesCleared = 0;
+
+  function drawSquare(x, y, color) {
+    context.fillStyle = color;
+    context.fillRect(x * scale, y * scale, scale, scale);
+    context.strokeStyle = 'white';
+    context.strokeRect(x * scale, y * scale, scale, scale);
+  }
+
+  function drawText(text, x, y, fontSize = 16, color = 'white') {
+    context.fillStyle = color;
+    context.font = `${fontSize}px Arial`;
+    context.fillText(text, x, y);
+  }
+
+  function drawMainMenu() {
+    context.clearRect(0, 0, canvas.width, canvas.height);  // Clear the canvas
+
+    // Background for the menu
+    context.fillStyle = '#222';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw Title
+    context.fillStyle = 'white';
+    context.font = 'bold 30px Arial';
+    context.textAlign = 'center';
+    context.fillText('TETRIS', canvas.width / 2, 100);
+
+    // Draw Start Game Button
+    context.font = '20px Arial';
+    context.fillText('Press ENTER to Start', canvas.width / 2, 200);
+
+    // Draw Instructions
+    context.font = '15px Arial';
+    context.fillText('Use WASD, UHJK, or Arrow Keys to Move, UP to Rotate', canvas.width / 2, 250);
+    context.fillText('Press SHIFT to Hold a Piece', canvas.width / 2, 280);
+  }
+
+
+
+  function randomPiece() {
+    if (pieceBag.length === 0) {
+      // Refill the bag with all the pieces and shuffle it
+      pieceBag = pieces.slice();  // Copy the pieces array
+      pieceBag = shuffleArray(pieceBag);  // Shuffle the bag
+    }
+    
+    let piece;
+    do {
+      piece = pieceBag.pop();  // Draw the next piece from the bag
+    } while (piece === lastPiece && pieceBag.length > 0);  // Ensure it's different from the last piece
+
+    lastPiece = piece;  // Update last piece to the current one
+    
+    const newPiece = new Piece(piece[0], piece[1]);
+
+    if (newPiece.collide()) {
+      gameOver();
+      return null;
+    }
+
+    return newPiece;
+  }
+
+  function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+  }
+
+  function drawScorePanel() {
+    // Create a linear gradient for the score panel background
+    const gradient = context.createLinearGradient(columns * scale, 0, 400, 400);
+    gradient.addColorStop(0, '#444');
+    gradient.addColorStop(1, '#666');
+
+    // Draw the gradient background
+    context.fillStyle = gradient;
+    context.fillRect(columns * scale, 0, 400 - columns * scale, 400);
+
+    // Draw inner shadow
+    context.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    context.fillRect(columns * scale + 5, 5, 400 - columns * scale - 10, 390);
+
+    // Draw Score and Level Text
+    context.fillStyle = 'white';
+    context.font = 'bold 20px Arial';
+    context.textAlign = 'center';
+
+    drawText(`Score`, columns * scale + (400 - columns * scale) / 2, 50);  // Title centered
+    drawText(`${score}`, columns * scale + (400 - columns * scale) / 2, 90);  // Score centered below title
+
+    drawText(`Level`, columns * scale + (400 - columns * scale) / 2, 150);  // Level title centered
+    drawText(`${level}`, columns * scale + (400 - columns * scale) / 2, 190);  // Level value centered below title
+
+    drawHeldPiece();  // Draw the held piece section
+  }
+
+  function drawGrid() {
+    context.strokeStyle = '#333';
+    for (let x = 0; x <= columns; x++) {
+      context.beginPath();
+      context.moveTo(x * scale, 0);
+      context.lineTo(x * scale, rows * scale);
+      context.stroke();
+    }
+    for (let y = 0; y <= rows; y++) {
+      context.beginPath();
+      context.moveTo(0, y * scale);
+      context.lineTo(columns * scale, y * scale);
+      context.stroke();
+    }
+  }
+
+  function randomPiece() {
+    const r = Math.floor(Math.random() * pieces.length);
+    const piece = new Piece(pieces[r][0], pieces[r][1]);
+
+    // Only trigger game over if the new piece collides right at spawn
+    if (piece.collide()) {
+      gameOver();
+      return null;  // Return null to indicate the game is over
+    }
+
+    return piece;
+  }
+
+  class Piece {
+    constructor(matrix, color) {
+      this.matrix = matrix;
+      this.color = color;
+      this.x = Math.floor(columns / 2) - Math.floor(matrix[0].length / 2);
+      this.y = 0;
+    }
+
+
+    draw() {
+      this.matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+          if (value !== 0) {
+            drawSquare(this.x + x, this.y + y, this.color);
+          }
+        });
+      });
+    }
+
+    move(dir) {
+      this.x += dir;
+      if (this.collide() || this.outOfBounds()) {
+        this.x -= dir; // Revert if there is a collision or it's out of bounds
+      }
+    }
+
+    rotate() {
+      const originalMatrix = this.matrix;
+      this.matrix = this.matrix[0].map((_, index) =>
+        this.matrix.map(row => row[index]).reverse()
+      );
+
+      // Check for collisions or out-of-bounds after rotation
+      if (this.collide() || this.outOfBounds()) {
+        this.matrix = originalMatrix; // Revert to the original matrix if there's a collision
+      }
+    }
+
+    outOfBounds() {
+      return this.matrix.some((row, y) =>
+        row.some((value, x) => value !== 0 && (this.x + x < 0 || this.x + x >= columns))
+      );
+    }
+
+    hardDrop() {
+      while (!this.collide()) {
+        this.y++;
+      }
+      this.y--; // Go back up one because we've gone too far
+      this.lock();
+    }
+
+    drop() {
+      this.y++;
+      if (this.collide()) {
+        this.y--;
+        this.lock();
+      }
+    }
+
+    collide() {
+      for (let y = 0; y < this.matrix.length; y++) {
+        for (let x = 0; x < this.matrix[y].length; x++) {
+          if (this.matrix[y][x] !== 0) {
+            if (
+              this.y + y >= rows ||  // Check if piece is at the bottom
+              this.y + y < 0 ||      // Check if piece is above the board (out of bounds)
+              (arena[this.y + y] && arena[this.y + y][this.x + x] !== 0)  // Check if piece hits another piece
+            ) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    }
+
+    lock() {
+      placePiece();
+      if (this.y <= 0) {  // Check if the piece is locked at the very top of the board
+        gameOver();  // Trigger the game over if the piece locks at the top
+      } else {
+        p = randomPiece();
+        if (!p) return;  // If randomPiece returns null, the game is over
+      }
+      dropCounter = 0; // Reset drop counter after locking a piece to avoid instant drops
+    }
+  
+  }
+  let arena = Array.from({ length: rows }, () => Array(columns).fill(0));
+
+  function placePiece() {
+    p.matrix.forEach((row, y) => {
+      row.forEach((value, x) => {
+        if (value !== 0 && p.y + y >= 0) {  // Only place blocks within bounds of the arena
+          arena[p.y + y][p.x + x] = value;
+        }
+      });
+  });
+    clearLines();
+  }
+  function drawHeldPiece() {
+    // Draw the background for the hold box
+    context.fillStyle = '#666';
+    context.fillRect(columns * scale + 5, 220, 400 - columns * scale - 10, 100);
+
+    // Draw "Hold" text
+    context.fillStyle = 'white';
+    context.font = 'bold 20px Arial';
+    drawText(`Hold`, columns * scale + (400 - columns * scale) / 2, 250);
+
+    if (heldPiece) {
+      // Draw the held piece
+      heldPiece.matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+          if (value !== 0) {
+            drawSquare(columns + 2 + x, 13 + y, heldPiece.color);
+          }
+        });
+      });
+    } else {
+      // If no piece is held, display a placeholder message
+      context.fillStyle = '#ccc';
+      context.font = '16px Arial';
+      drawText(`No piece`, columns * scale + (400 - columns * scale) / 2, 290);
+    }
+  }
+
+    function holdPiece() {
+  if (canHold) {
+    if (heldPiece) {
+      [p, heldPiece] = [heldPiece, p];  // Swap the held piece with the current piece
+      p.x = Math.floor(columns / 2) - Math.floor(p.matrix[0].length / 2);  // Reset position
+      p.y = 0;
+    } else {
+      heldPiece = p;
+      p = randomPiece();
+    }
+    canHold = false;  // Disable holding until the next piece is locked
+  }
+}
+
+  function clearLines() {
+    let lines = 0;
+    outer: for (let y = arena.length - 1; y > 0; --y) {
+      for (let x = 0; x < arena[y].length; ++x) {
+        if (arena[y][x] === 0) {
+          continue outer;
+        }
+      }
+      const row = arena.splice(y, 1)[0].fill(0);
+      arena.unshift(row);
+      ++y;
+      lines++;
+    }
+    if (lines > 0) {
+      updateScore(lines);
+      linesCleared += lines;
+      updateLevel();
+    }
+  }
+
+  
+  function gameOver() {
+    context.fillStyle = 'rgba(0, 0, 0, 0.7)';  // Dark overlay
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    
+    context.fillStyle = 'white';
+    context.font = '30px Arial';
+    context.textAlign = 'center';
+    context.fillText('Game Over', canvas.width / 2, canvas.height / 2 - 20);
+    context.font = '20px Arial';
+    context.fillText('Press ENTER to Play Again', canvas.width / 2, canvas.height / 2 + 20);
+    
+    gameState = "gameOver";  // Change the game state to game over
+    cancelAnimationFrame(animationId);  // Stop the game loop
+  }
+
+  function updateScore(lines) {
+    const points = lines === 1 ? 100 : lines === 2 ? 300 : lines === 3 ? 500 : 800;
+    score += points * level;
+  }
+
+  function updateLevel() {
+    if (linesCleared >= level * 10) {  // Increase level after clearing 10 lines per level
+      level++;
+      
+      // Adjust the drop interval more aggressively
+      dropInterval = Math.max(50, 1000 - level * 100); // Minimum drop interval is 50ms
+    }
+  }
+  function resetGame() {
+    arena = Array.from({ length: rows }, () => Array(columns).fill(0));  // Reset the arena
+    score = 0;
+    level = 1;
+    linesCleared = 0;
+    heldPiece = null;
+    canHold = true;
+    p = randomPiece();
+    dropInterval = 1000;  // Reset drop interval
+    gameState = "playing";  // Set game state to playing
+    update();  // Restart the game loop
+  }
+
+  document.addEventListener('keydown', event => {
+    if (gameState === "menu" && event.key === "Enter") {
+      gameState = "playing";
+      update();  // Start the game loop
+    } else if (gameState === "playing") {
+      if (event.key === "ArrowLeft" || event.key === "a" || event.key === "h") {
+        p.move(-1);
+      } else if (event.key === "ArrowRight" || event.key === "d" || event.key === "k") {
+        p.move(1);
+      } else if (event.key === "ArrowDown" || event.key === "s" || event.key === "j") {
+        p.hardDrop();
+      } else if (event.key === "ArrowUp" || event.key === "w" || event.key === "u") {
+        p.rotate();
+      } else if (event.key === "Shift") {
+        holdPiece();
+      }
+    } else if (gameState === "gameOver" && event.key === "Enter") {
+      resetGame();  // Reset the game if Enter is pressed after game over
+    }
+  });
+
+  let p = randomPiece();
+  let dropCounter = 0;
+  let dropInterval = 1000;
+  let lastTime = 0;
+
+  let animationId;
+  function update(time = 0) {
+    if (gameState === "menu") {
+      drawMainMenu();  // Draw the menu if in the menu state
+    } else if (gameState === "playing") {
+      const deltaTime = time - lastTime;
+      lastTime = time;
+      dropCounter += deltaTime;
+
+      if (dropCounter > dropInterval) {
+        p.drop();
+        dropCounter = 0;
+      }
+
+      if (p !== null) {  // Ensure p is not null before proceeding
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        arena.forEach((row, y) => {
+          row.forEach((value, x) => {
+            if (value !== 0) {
+              drawSquare(x, y, 'gray');
+            }
+          });
+        });
+        drawGrid();
+        p.draw();  // Draw the current piece
+        drawScorePanel();
+      }
+      
+      animationId = requestAnimationFrame(update);
+    }
+  }
+
+    update();
+</script>
+</body>
+</html>

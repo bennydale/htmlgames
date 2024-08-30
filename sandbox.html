@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>2D Sandbox Canvas Game with Control Panel</title>
+    <style>
+        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #333; }
+        canvas { border: 1px solid #000; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const SIM_WIDTH = 300;
+        const SIM_HEIGHT = 300;
+        const CONTROL_PANEL_WIDTH = 100;
+        const GRID_SIZE = 3;
+        const rows = SIM_HEIGHT / GRID_SIZE;
+        const cols = SIM_WIDTH / GRID_SIZE;
+
+        let brushSize = 1;
+        let simSpeed = 1;
+        let isRunning = true;
+        let simulationWalls = false;
+        let draggingBrush = false;
+        let draggingSpeed = false;
+        let isPlacingMaterial = false;
+        let showTerminal = false;
+        let terminalInput = '';
+        let terminalHistory = [];
+        let maxTerminalHistory = 2; // Adjust this based on how many lines you want visible at a time
+        let isKillModeActive = false;
+        let menuScreen = true;
+        const terminalHeight = 100;
+        const lineHeight = 16;
+        const maxVisibleLines = Math.floor(terminalHeight / lineHeight);
+        
+        
+
+
+        document.addEventListener('keydown', (event) => {
+          if (event.key === '`' || event.key === '~') {
+              showTerminal = !showTerminal;
+          } else if (showTerminal) {
+              if (event.key === 'Enter') {
+                  executeCommand(terminalInput);
+                  terminalInput = '';
+              } else if (event.key === 'Backspace') {
+                  terminalInput = terminalInput.slice(0, -1);
+              } else {
+                  terminalInput += event.key;
+              }
+          }
+        });
+
+        // Define materials
+        const materials = {
+            air: 0,
+            sand: 1,
+            stone: 2,
+            wood: 3,
+            dirt: 4,
+            cotton: 5,
+            mold: 6,
+            dust: 7,
+            water: 8,
+            fire: 9,
+        };
+
+        var materialNames = ['air', 'Sand', 'Stone', 'Wood', 'Dirt', 'Cotton', 'Mold', 'Dust', 'Water', 'Fire'];
+        
+          
+        
+        let selectedMaterial = materials.sand;
+
+        const materialColors = {
+            [materials.air]: '#333',
+            [materials.sand]: 'yellow',
+            [materials.stone]: '#7f7f7f',
+            [materials.wood]: '#8b4513',
+            [materials.dirt]: '#a0522d',
+            [materials.cotton]: '#fff',
+            [materials.mold]: '#228b22',
+            [materials.dust]: '#d3d3d3',
+            [materials.water]: 'blue',
+            [materials.fire]: 'orange',
+        };
+
+        const materialSelectorHeight = 50;
+
+        // Initialize the grid with empty cells
+        const grid = Array.from({ length: rows }, () => Array(cols).fill(materials.air));
+
+        function drawGrid() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    const material = grid[row][col];
+                    ctx.fillStyle = materialColors[material];
+                    if (material !== materials.air) {
+                        ctx.fillRect(col * GRID_SIZE, row * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+                    }
+                }
+            }
+
+            if (simulationWalls) {
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(0, 0, SIM_WIDTH, SIM_HEIGHT);
+            }
+        }
+
+        function updateGrid() {
+          for (let i = 0; i < simSpeed; i++) {
+              let interval = simulationWalls ? 2 : 1;
+              for (let row = rows - interval; row >= 0; row--) {
+                  for (let col = 0; col < cols; col++) {
+                      processCell(row, col);
+                  }
+              }
+          }
+      }
+
+      function processCell(row, col) {
+        const material = grid[row][col];
+        if (material !== materials.air) {
+            let moved = false;
+
+            // Sand, Dirt, Dust falls down
+        // Sand, Dirt, Dust falls down
+        if (material === materials.sand || material === materials.dirt || material === materials.dust) {
+            if (grid[row + 1] && grid[row + 1][col] === materials.air) {
+                // Move straight down
+                grid[row][col] = materials.air;
+                grid[row + 1][col] = material;
+                moved = true;
+            } else {
+                // Check both left and right diagonal movement
+                const canMoveLeft = col > 0 && grid[row + 1] && grid[row + 1][col - 1] === materials.air;
+                const canMoveRight = col < cols - 1 && grid[row + 1] && grid[row + 1][col + 1] === materials.air;
+
+                if (canMoveLeft && canMoveRight) {
+                    // Randomly choose left or right when both are available
+                    if (Math.random() < 0.5) {
+                        grid[row][col] = materials.air;
+                        grid[row + 1][col - 1] = material;
+                    } else {
+                        grid[row][col] = materials.air;
+                        grid[row + 1][col + 1] = material;
+                    }
+                    moved = true;
+                } else if (canMoveLeft) {
+                    grid[row][col] = materials.air;
+                    grid[row + 1][col - 1] = material;
+                    moved = true;
+                } else if (canMoveRight) {
+                    grid[row][col] = materials.air;
+                    grid[row + 1][col + 1] = material;
+                    moved = true;
+                }
+            }
+          
+        }
+        
+        // Water behavior (from previous logic)
+        if (material === materials.water) {
+            if (grid[row + 1] && grid[row + 1][col] === materials.air) {
+                grid[row][col] = materials.air;
+                grid[row + 1][col] = materials.water;
+                moved = true;
+            } else {
+                let leftDown = col > 0 && grid[row + 1] && grid[row + 1][col - 1] === materials.air;
+                let rightDown = col < cols - 1 && grid[row + 1] && grid[row + 1][col + 1] === materials.air;
+
+                if (leftDown && rightDown) {
+                    if (Math.random() < 0.5) {
+                        grid[row][col] = materials.air;
+                        grid[row + 1][col - 1] = materials.water;
+                    } else {
+                        grid[row][col] = materials.air;
+                        grid[row + 1][col + 1] = materials.water;
+                    }
+                    moved = true;
+                } else if (leftDown) {
+                    grid[row][col] = materials.air;
+                    grid[row + 1][col - 1] = materials.water;
+                    moved = true;
+                } else if (rightDown) {
+                    grid[row][col] = materials.air;
+                    grid[row + 1][col + 1] = materials.water;
+                    moved = true;
+                } else {
+                    let left = col > 0 && grid[row][col - 1] === materials.air;
+                    let right = col < cols - 1 && grid[row][col + 1] === materials.air;
+
+                    if (left && right) {
+                        if (Math.random() < 0.5) {
+                            grid[row][col] = materials.air;
+                            grid[row][col + 1] = materials.water;
+                            
+                        } else {
+                            grid[row][col] = materials.air;
+                            grid[row][col - 1] = materials.water;
+                        }
+                        moved = true;
+                    } else if (left) {
+                        grid[row][col] = materials.air;
+                        grid[row][col - 1] = materials.water;
+                        moved = true;
+                    } else if (right) {
+                        grid[row][col] = materials.air;
+                        grid[row][col + 1] = materials.water;
+                        moved = true;
+                    }
+                }
+            }
+        }
+
+        // Mold spreading behavior
+        if (material === materials.mold) {
+            let adjacentWoodOrCotton = false;
+
+            if (grid[row - 1] && (grid[row - 1][col] === materials.wood || grid[row - 1][col] === materials.cotton)) {
+                if (Math.random() < 0.2) {
+                    grid[row - 1][col] = materials.mold;
+                    adjacentWoodOrCotton = true;
+                }
+            }
+            if (grid[row + 1] && (grid[row + 1][col] === materials.wood || grid[row + 1][col] === materials.cotton)) {
+                if (Math.random() < 0.2) {
+                    grid[row + 1][col] = materials.mold;
+                    adjacentWoodOrCotton = true;
+                }
+            }
+            if (grid[row][col - 1] === materials.wood || grid[row][col - 1] === materials.cotton) {
+                if (Math.random() < 0.2) {
+                    grid[row][col - 1] = materials.mold;
+                    adjacentWoodOrCotton = true;
+                }
+            }
+            if (grid[row][col + 1] === materials.wood || grid[row][col + 1] === materials.cotton) {
+                if (Math.random() < 0.2) {
+                    grid[row][col + 1] = materials.mold;
+                    adjacentWoodOrCotton = true;
+                }
+            }
+
+            if (!adjacentWoodOrCotton) {
+                if (Math.random() < 0.01) {
+                    grid[row][col] = materials.dust;
+                }
+            }
+        }
+
+        // Wood and cotton rotting when touching mold
+        if ((material === materials.wood || material === materials.cotton) &&
+            (grid[row - 1] && grid[row - 1][col] === materials.mold ||
+             grid[row + 1] && grid[row + 1][col] === materials.mold ||
+             grid[row][col - 1] === materials.mold ||
+             grid[row][col + 1] === materials.mold)) {
+            if (Math.random() < 0.02) {
+                grid[row][col] = materials.mold;
+            }
+        }
+
+        // Fire behavior
+        if (material === materials.fire) {
+            // Spread fire to adjacent flammable materials
+            const spreadFire = (r, c) => {
+                if (grid[r] && (grid[r][c] === materials.wood || grid[r][c] === materials.cotton)) {
+                    grid[r][c] = materials.fire;
+                }
+            };
+
+            spreadFire(row - 1, col);
+            spreadFire(row + 1, col);
+            spreadFire(row, col - 1);
+            spreadFire(row, col + 1);
+
+            // Burn out after a short period
+            if (Math.random() < 0.1) {
+                grid[row][col] = materials.air;
+            }
+        }
+
+        // Handle walls
+        if (simulationWalls && !moved) {
+            if (row + 1 >= rows || col <= 0 || col >= cols - 1) {
+                grid[row][col] = material;
+                if (row + 1 >= rows) grid[row - 1][col] = materials.air;
+            }
+        } else if (!simulationWalls && (row + 1 >= rows || col <= 0 || col >= cols - 1)) {
+            grid[row][col] = materials.air;
+        }
+    }
+}
+
+        function placeMaterial(x, y) {
+            const colStart = Math.max(Math.floor(x / GRID_SIZE) - Math.floor(brushSize / 2), 0);
+            const rowStart = Math.max(Math.floor(y / GRID_SIZE) - Math.floor(brushSize / 2), 0);
+            const colEnd = Math.min(colStart + brushSize, cols);
+            const rowEnd = Math.min(rowStart + brushSize, rows);
+
+            for (let row = rowStart; row < rowEnd; row++) {
+                for (let col = colStart; col < colEnd; col++) {
+                    grid[row][col] = selectedMaterial;
+                }
+            }
+        }
+
+        function drawControlPanel() {
+          ctx.fillStyle = '#222';
+          ctx.fillRect(SIM_WIDTH, 0, CONTROL_PANEL_WIDTH, SIM_HEIGHT);
+
+          ctx.fillStyle = 'white';
+          ctx.font = '14px Arial';
+          ctx.fillText('Control Panel', SIM_WIDTH + 10, 20);
+
+          ctx.fillText('Brush Size:', SIM_WIDTH + 10, 50);
+          ctx.fillRect(SIM_WIDTH + 10, 60, 80, 20);
+          ctx.fillStyle = isKillModeActive ? 'red' : 'yellow';
+          ctx.fillRect(SIM_WIDTH + 10, 60, brushSize * 8, 20);
+
+          ctx.fillStyle = 'white';
+          ctx.fillText('Speed:', SIM_WIDTH + 10, 100);
+          ctx.fillRect(SIM_WIDTH + 10, 110, 80, 20);
+          ctx.fillStyle = isKillModeActive ? 'red' : 'yellow';
+          ctx.fillRect(SIM_WIDTH + 10, 110, simSpeed * 8, 20);
+
+          ctx.fillStyle = 'white';
+          ctx.fillText('Pause/Play:', SIM_WIDTH + 10, 150);
+          ctx.fillStyle = isKillModeActive ? 'red' : (isRunning ? 'green' : 'red');
+          ctx.fillRect(SIM_WIDTH + 10, 160, 80, 20);
+
+          ctx.fillStyle = 'white';
+          ctx.fillText('Walls:', SIM_WIDTH + 10, 200);
+          ctx.fillStyle = isKillModeActive ? 'red' : (simulationWalls ? 'green' : 'red');
+          ctx.fillRect(SIM_WIDTH + 10, 210, 80, 20);
+
+          ctx.fillStyle = 'white';
+          ctx.fillText('Clear:', SIM_WIDTH + 10, 250);
+          ctx.fillStyle = isKillModeActive ? 'red' : 'blue';
+          ctx.fillRect(SIM_WIDTH + 10, 260, 80, 20);
+        }
+
+        function drawMaterialSelection() {
+        const materialWidth = 35;
+        const materialHeight = materialSelectorHeight - 20;
+        const startX = 5;
+        const startY = SIM_HEIGHT + 5;
+
+        Object.keys(materials).forEach((material, index) => {
+            ctx.fillStyle = materialColors[materials[material]];
+            ctx.fillRect(startX + index * materialWidth, startY, materialWidth, materialHeight);
+            ctx.fillStyle = 'black';
+            ctx.font = '10px Arial';
+            ctx.fillText(materialNames[index], startX + index * materialWidth + 2, startY + materialHeight + 10);
+        });
+      }
+
+
+      // TERMINAL CODE
+
+      function createStaticNoise() {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const bufferSize = 2 * audioCtx.sampleRate;
+        const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+
+        for (let i = 0; i < bufferSize; i++) {
+            output[i] = Math.random() * 2 - 1;
+        }
+
+        const whiteNoise = audioCtx.createBufferSource();
+        whiteNoise.buffer = noiseBuffer;
+        whiteNoise.loop = true;
+        whiteNoise.connect(audioCtx.destination);
+        whiteNoise.start();
+
+        return whiteNoise;
+      }
+
+      function activateKillMode() {
+        // Set a flag to indicate that the simulation is in "kill" mode
+        isKillModeActive = true;
+
+        // Change all control panel options to red
+        document.querySelectorAll('canvas').forEach(canvas => {
+            canvas.style.borderColor = 'red';
+        });
+
+        // Change all material colors to red for extra chaos
+        for (let key in materialColors) {
+            materialColors[key] = 'red';
+        }
+
+        // Update the terminal with a creepy message
+        terminalHistory.push('Y0u SH()uldn\'t hqv3 Tip3d TLAT&^@$%!.');
+
+        // Play static noise
+        noiseSource = createStaticNoise();
+
+        // Set all control panel buttons to red
+        document.querySelectorAll('.control-panel-button').forEach(button => {
+            button.style.backgroundColor = 'red';
+        });
+
+        materialNames = ['LET', 'THE', 'STATIC', 'TEAR', 'YOU', 'APPART', 'FOR', 'YOUR', 'SINS', ''];
+
+        drawControlPanel();
+
+      }
+
+      // Function to execute terminal commands
+      function executeCommand(command) {
+        terminalHistory.push(`> ${command}`);
+        if (terminalHistory.length > maxTerminalHistory) {
+            terminalHistory.shift(); // Remove the oldest command if we exceed history length
+        }
+        const parts = command.split(' ');
+        const cmd = parts[0].toLowerCase();
+        const args = parts.slice(1);
+
+        switch (cmd) {
+          case 'brushsize':
+              if (args.length > 0) {
+                  brushSize = parseInt(args[0]);
+                  terminalHistory.push(`Brush size set to ${brushSize}`);
+              } else {
+                  terminalHistory.push('Usage: brushsize [size]');
+              }
+              break;
+          case 'speed':
+              if (args.length > 0) {
+                  simSpeed = parseInt(args[0]);
+                  terminalHistory.push(`Simulation speed set to ${simSpeed}`);
+              } else {
+                  terminalHistory.push('Usage: speed [value]');
+              }
+              break;
+          case 'clear':
+              clearGrid();
+              terminalHistory.push('Grid cleared.');
+              break;
+          case 'setcolor':
+              if (args.length > 1) {
+                  const material = materials[args[0].toLowerCase()];
+                  if (material !== undefined) {
+                      materialColors[material] = args[1];
+                      terminalHistory.push(`${args[0]} color set to ${args[1]}`);
+                  } else {
+                      terminalHistory.push(`Unknown material: ${args[0]}`);
+                  }
+              } else {
+                  terminalHistory.push('Usage: setcolor [material] [color]');
+              }
+              break;
+              case 'speed':
+                if (args.length > 0) {
+                    simSpeed = parseInt(args[0]);
+                    terminalHistory.push(`Simulation speed set to ${simSpeed}`);
+                } else {
+                    terminalHistory.push('Usage: speed [value]');
+                }
+                break;
+
+                case 'clear':
+                clearGrid();
+                terminalHistory.push('Grid cleared.');
+                break;
+
+          case 'material':
+              if (args.length > 0) {
+                  const material = materials[args[0].toLowerCase()];
+                  if (material !== undefined) {
+                      selectedMaterial = material;
+                      terminalHistory.push(`Material set to ${args[0]}`);
+                  } else {
+                      terminalHistory.push(`Unknown material: ${args[0]}`);
+                  }
+              } else {
+                  terminalHistory.push('Usage: material [material]');
+              }
+              break;
+              case 'kill':
+              activateKillMode();
+              terminalHistory.push('Y0u $H()uidn\'t hqv3 Tip3d TLAT&^@$%!%..');
+              break;
+              default:
+                terminalHistory.push(`Unknown command: ${cmd}`);
+                break;
+        }
+      }
+
+      // Modify your existing draw function to include the terminal
+      function drawGrid() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (isKillModeActive) {
+            // Fill the screen with random shades of red
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    const redShade = Math.floor(Math.random() * 256); // Random value between 0 and 255
+                    ctx.fillStyle = `rgb(${redShade}, 0, 0)`;
+                    ctx.fillRect(col * GRID_SIZE, row * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+                }
+            }
+        } else {
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    const material = grid[row][col];
+                    ctx.fillStyle = materialColors[material];
+                    if (material !== materials.air) {
+                        ctx.fillRect(col * GRID_SIZE, row * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+                    }
+                }
+            }
+
+            if (simulationWalls) {
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(0, 0, SIM_WIDTH, SIM_HEIGHT);
+            }
+        }
+
+        if (showTerminal) {
+            drawTerminal();
+        }
+      }
+
+      // Function to draw the terminal on the canvas
+      // Function to draw the terminal on the canvas
+      function drawTerminal() {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+          ctx.fillRect(0, SIM_HEIGHT - terminalHeight, SIM_WIDTH, terminalHeight);
+          
+          ctx.fillStyle = 'green';
+          ctx.font = '14px monospace';
+
+          const visibleHistory = terminalHistory.slice(-maxVisibleLines); // Only show the most recent commands
+
+          for (let i = 0; i < visibleHistory.length; i++) {
+              ctx.fillText(visibleHistory[i], 10, SIM_HEIGHT - terminalHeight + (i + 1) * lineHeight);
+          }
+
+          // Draw the current input line, ensuring it's within bounds
+          ctx.fillText('> ' + terminalInput, 10, SIM_HEIGHT - terminalHeight + (visibleHistory.length + 1) * lineHeight - 5);
+      }
+
+      canvas.addEventListener('mousedown', (event) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        console.log(`Mouse Clicked at: ${x} ${y}`);
+
+        if (x < SIM_WIDTH && y < SIM_HEIGHT) {
+            isPlacingMaterial = true;
+            placeMaterial(x, y);
+        } else if (x >= SIM_WIDTH + 10 && x <= SIM_WIDTH + 90) {
+            if (y >= 60 && y <= 80) {
+                draggingBrush = true;
+                updateBrushSize(x);
+            } else if (y >= 110 && y <= 130) {
+                draggingSpeed = true;
+                updateSimSpeed(x);
+            } else if (y >= 160 && y <= 180) {
+                isRunning = !isRunning;
+                console.log('Pause/Play clicked');
+            } else if (y >= 210 && y <= 230) {
+                simulationWalls = !simulationWalls;
+                console.log('Walls clicked');
+            } else if (y >= 260 && y <= 280) {
+                clearGrid();
+                console.log('Clear clicked');
+            }
+        } else if (y > SIM_HEIGHT && y <= SIM_HEIGHT + materialSelectorHeight) {
+            const materialIndex = Math.floor((x - 5) / 35);
+            selectedMaterial = Object.values(materials)[materialIndex];
+            console.log(`Material selected: ${materialNames[materialIndex]}`);
+            console.log(`Selected material index: ${materialIndex}, Expected fire index: ${Object.values(materials).indexOf(materials.fire)}`);
+        }
+    });
+
+        canvas.addEventListener('mousemove', (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+
+            if (isPlacingMaterial && x < SIM_WIDTH && y < SIM_HEIGHT) {
+                placeMaterial(x, y);
+            } else if (draggingBrush) {
+                updateBrushSize(x);
+            } else if (draggingSpeed) {
+                updateSimSpeed(x);
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isPlacingMaterial = false;
+            draggingBrush = false;
+            draggingSpeed = false;
+        });
+
+        function updateBrushSize(x) {
+            brushSize = Math.min(Math.max(Math.floor((x - SIM_WIDTH - 10) / 8) + 1, 1), 10);
+        }
+
+        function updateSimSpeed(x) {
+            simSpeed = Math.min(Math.max(Math.floor((x - SIM_WIDTH - 10) / 8) + 1, 1), 10);
+        }
+
+        function clearGrid() {
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    grid[row][col] = materials.air;
+                }
+            }
+        }
+        function gameLoop() {
+          if (menuScreen) {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, 400, 400);
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Impact';
+            ctx.fillText('Welcome to the Sandbox', 100, 50);
+            ctx.font = '16px Arial';
+            ctx.fillText('this game is VERY un-finished, and i do not plan on', 10, 100);
+            ctx.fillText('continuing progress in development.', 10, 126);
+            ctx.fillText('press: "~" to open the console', 10, 200);
+            ctx.fillText('the commands are: speed [number],', 10, 226);
+            ctx.fillText('brushsize [number], setcolor [material] [color],', 10, 252);
+            ctx.fillText('clear, material [material], and k&#^@(!^)#@&^%!(#^%)*@#,', 10, 278);
+            ctx.fillText('(also the button to summon fire is broken so use the', 10, 320);
+            ctx.fillText('"material" command in the console to obtain it)', 10, 346);
+            ctx.fillText('click to start', 10, 390);
+            
+
+            canvas.addEventListener('click', () => {
+              if (menuScreen) {
+              menuScreen = false;
+              requestAnimationFrame(gameLoop);
+              }
+            });
+
+          } else {
+            
+            if (isRunning) {
+              updateGrid();
+            }
+            drawGrid();
+            drawControlPanel();
+            drawMaterialSelection();
+            requestAnimationFrame(gameLoop);
+          }
+        }
+
+        gameLoop();
+        </script>
+        </body>
+        </html>

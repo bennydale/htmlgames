@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Impact&display=swap');
+    </style>
+</head>
+<body>
+    <canvas id="myCanvas" width="400" height="400"></canvas>
+    <audio id="easyAudio" loop>
+        <source src="easyDifficulty.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="mediumAudio" loop>
+        <source src="mediumDifficulty.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="hardAudio" loop>
+        <source src="hardDifficulty.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        var gameState = "menu";
+        var gameDifficulty = "null";
+        var currentQuestionIndex = 0;
+        var totalScore = 0;
+        var baseScore = 1000;
+        var questionScore = baseScore; // Base score for each question
+        var amountOfTimeToAnswer = 10; // Time in seconds to answer each question
+        var timeLeft = amountOfTimeToAnswer; // Time in seconds to answer each question
+        var timerInterval;
+        var scoreDecrement = 100; // Points deducted per second
+
+        var easyQuestions = [
+            {
+                question: "Which government agency is hiding that ",
+                question2: "the earth is flat?",
+                options: ["NASA", "JOE BIDEN", "THE FBI", "I'm not stupid"],
+                answer: 0
+            },
+            {
+                question: "Did we land on the moon?",
+                question2: "",
+                options: ["Yes", "No, it was filmed", "Maybe", "It's a conspiracy"],
+                answer: 1
+            },
+            {
+                question: "Is the earth flat?",
+                question2: "",
+                options: ["Yes", "No", "Maybe", "It's a conspiracy"],
+                answer: 0
+            }
+        ];
+
+        var mediumQuestions = [
+            {
+                question: "Who is responsible for the Covid-19 ",
+                question2: "pandemic?",
+                options: ["Jeff Bezos", "A bat (I am a fat porky if I click this)", "A Chinese lab (but the CCP is hiding it)", "It's a conspiracy"],
+                answer: 2
+            },
+            {
+                question: "Where can you find a sputix to heal your ",
+                question2: "chackaras and cure your poisoning?",
+                options: ["by the budast god", "i have no idea what u said", "middle earth", "at the fourth plane of existance"],
+                answer: 3
+            },
+            {
+                question: "Who is responsible for making AI deepfakes",
+                question2: "of all the people on the internet?",
+                options: ["the government", "a secret illuminati society", "logan paul", "all of the above"],
+                answer: 3
+            }
+        ];
+
+        var hardQuestions = [
+            {
+                question: "What shape-shifting reptilian overlords ",
+                question2: "control the world?",
+                options: ["the praying mantis of haxingan", "mark zuckerberg", "the chamelion of avbasna", "the sheep of the 5th dimension"],
+                answer: 2
+            },
+            {
+                question: "Who assassinated JFK?",
+                question2: "",
+                options: ["Lee Harvey Oswald", "The CIA", "The Mafia", "Obama"],
+                answer: 2
+            },
+            {
+                question: "who is trying to hide the fact that the moon ",
+                question2: "is a hologram?",
+                options: ["the cia", "the chamelion of avbasna", "joe biden", "i dont know"],
+                answer: 0
+            },
+            {
+                question: "what homeremedy cures cancer?",
+                question2: "",
+                options: ["garlic", "himilaion oil", "pink salt", "doctors"],
+                answer: 0
+            },
+            {
+                question: "what should you do if someone does not know",
+                question2: "their star-sign?",
+                options: ["try to educate them", "publkkicly emberas them", "beat them up", "un-freind them in facebook"],
+                answer: 2
+            },
+            {
+                question: "what should you do if your freind is not a",
+                question2: "jahova's witness?",
+                options: ["cut of all contact", "manipulate their family", "be accepting and understanding", "MAKE THEM whitness jahova"],
+                answer: 3
+            },
+            {
+                question: "how do you get rid of a demon?",
+                question2: "",
+                options: ["make a ring of salt around you", "himilaion oil", "the blood of a lamb", "I CAN HEAR THEM I CAN HEAR THEM I CAN HEAR THEM I CAN HEAR THEM"],
+                answer: 2
+            },
+            {
+                question: "what is the greatest pleasure in life?",
+                question2: "",
+                options: ["pumkin spice latte", "being vegan and not hurting the animals", "screaming at starbucks employs", "the facebook"],
+                answer: 0
+            },
+            {
+                question: "what should you do if you cant find",
+                question2: "true love because your insane & insicure?",
+                options: ["bang your head on a wall until you're sane", "manipulate your way into a partner", "accept your fate", "spiral into insanity"],
+                answer: 3
+            },
+            {
+                question: "what is the best way to get a job?",
+                question2: "",
+                options: ["work hard and apply", "manipulate your way in", "be a good person", "who needs a job when you have facebook"],
+                answer: 3
+            }
+        ];
+
+        var questions = [];
+
+        var canvas = document.getElementById('myCanvas');
+        var ctx = canvas.getContext('2d');
+        var scrollingTextY = -40;
+        var scrollingTextY2 = -200;
+        var buttonDisplayed = false;
+        var textHasGoneDown = true;
+        var textHasGoneDown2 = true;
+        var popupAlpha = 0;
+        var popupMessage = "";
+        var popupColor = "";
+
+        // Variables for the grid
+        var gridX = 0;
+        var gridY = 0;
+        var gridSize = 40;
+        var gridVelocityX = 0.5;
+        var gridVelocityY = 0.5;
+
+        var backgroundColor = "white";
+        var gridColor = "rgba(0, 0, 0, 0.1)";
+        var textColor = "black";
+
+        function drawGrid() {
+            ctx.fillStyle = backgroundColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = gridColor;
+            ctx.lineWidth = 1;
+            for (var x = gridX; x < 400; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, 400);
+                ctx.stroke();
+            }
+            for (var y = gridY; y < 400; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(400, y);
+                ctx.stroke();
+            }
+        }
+
+        function updateGrid() {
+            gridX += gridVelocityX;
+            gridY += gridVelocityY;
+            if (gridX >= gridSize || gridX <= -gridSize) gridVelocityX = -gridVelocityX;
+            if (gridY >= gridSize || gridY <= -gridSize) gridVelocityY = -gridVelocityY;
+        }
+
+        function drawButton() {
+            if (buttonDisplayed) {
+                ctx.fillStyle = "blue";
+                ctx.fillRect(150, 200, 106, 50);
+                ctx.fillStyle = "white";
+                ctx.font = "19px Arial";
+                ctx.fillText("Start Game", 153, 230);
+            }
+        }
+
+        function renderText() {
+            ctx.fillStyle = "blue";
+            ctx.font = "60px 'Impact', sans-serif";
+            if (scrollingTextY <= 70 && textHasGoneDown) {
+                scrollingTextY += 4;
+            } else {
+                scrollingTextY = 70;
+            }
+            ctx.fillText("Facebook", 75, scrollingTextY);
+
+            ctx.fillStyle = "red";
+            if (scrollingTextY2 <= 140 && textHasGoneDown2) {
+                scrollingTextY2 += 4;
+            } else {
+                scrollingTextY2 = 140;
+            }
+            ctx.fillText("Science", 75, scrollingTextY2);
+        }
+
+        function renderMenu() {
+            if (gameState === "menu") {
+                renderText();
+                drawButton();
+                if (scrollingTextY === 70) textHasGoneDown = false;
+                if (scrollingTextY === 70 && scrollingTextY2 === 140 && !buttonDisplayed) {
+                    textHasGoneDown2 = false;
+                    buttonDisplayed = true;
+                }
+            }
+        }
+
+        function handleCanvasClick(event) {
+            var rect = canvas.getBoundingClientRect();
+            var x = event.clientX - rect.left;
+            var y = event.clientY - rect.top;
+            if (gameState === "menu" && x >= 150 && x <= 256 && y >= 200 && y <= 250) {
+                startGame();
+            } else if (gameState === "difficultySelect") {
+                handleDifficultyClick(x, y);
+            } else if (gameState === "quiz") {
+                handleQuizClick(x, y);
+            } else if (gameState === "end" && x >= 150 && x <= 256 && y >= 200 && y <= 250) {
+                gameState = "menu";
+                currentQuestionIndex = 0;
+                totalScore = 0;
+                backgroundColor = "white"; // Reset background color
+                gridColor = "rgba(0, 0, 0, 0.1)"; // Reset grid color
+                textColor = "black"; // Reset text color
+                renderMenu();
+                stopAllAudio();
+            }
+        }
+
+        function fadeOut(callback) {
+            var alpha = 0;
+            function fade() {
+                ctx.clearRect(0, 0, 400, 400);
+                drawGrid();
+                ctx.fillStyle = "blue";
+                ctx.font = "60px 'Impact', sans-serif";
+                ctx.fillText("Facebook", 75, 70);
+                ctx.fillStyle = "red";
+                ctx.fillText("Science", 75, 140);
+                ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
+                ctx.fillRect(0, 0, 400, 400);
+                alpha += 0.02;
+                if (alpha < 1) {
+                    requestAnimationFrame(fade);
+                } else {
+                    callback();
+                }
+            }
+            fade();
+        }
+
+        function fadeIn(callback) {
+            var alpha = 1;
+            function fade() {
+                ctx.clearRect(0, 0, 400, 400);
+                drawGrid();
+                ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
+                ctx.fillRect(0, 0, 400, 400);
+                ctx.fillStyle = "black";
+                ctx.font = "50px 'Impact', sans-serif";
+                ctx.fillText("Select Difficulty", 50, 100);
+            
+                // Draw difficulty buttons
+                drawDifficultyButton(75, 150, "Easy");
+                drawDifficultyButton(75, 220, "Medium");
+                drawDifficultyButton(75, 290, "Hard");
+                alpha -= 0.02;
+                if (alpha > 0) {
+                    requestAnimationFrame(fade);
+                } else {
+                    callback();
+                }
+            }
+            fade();
+        }
+
+        function startGame() {
+            buttonDisplayed = false;
+            gameState = "fadingOut";
+            fadeOut(function() {
+                gameState = "difficultySelect";
+                fadeIn(renderDifficultySelect);
+            });
+        }
+
+        function renderDifficultySelect() {
+            ctx.clearRect(0, 0, 400, 400);
+            drawGrid();
+            ctx.fillStyle = "black";
+            ctx.font = "50px 'Impact', sans-serif";
+            ctx.fillText("Select Difficulty", 50, 100);
+            
+            // Draw difficulty buttons
+            drawDifficultyButton(75, 150, "Easy");
+            drawDifficultyButton(75, 220, "Medium");
+            drawDifficultyButton(75, 290, "Hard");
+        }
+
+        function drawDifficultyButton(x, y, text) {
+            ctx.fillStyle = "blue";
+            ctx.fillRect(x, y, 200, 50);
+            ctx.fillStyle = "white";
+            ctx.font = "25px Impact";
+            ctx.fillText(text, x + 30, y + 35);
+        }
+
+        function handleDifficultyClick(x, y) {
+            if (x >= 75 && x <= 275) {
+                if (y >= 150 && y <= 200) {
+                    selectDifficulty("Easy");
+                } else if (y >= 220 && y <= 270) {
+                    selectDifficulty("Medium");
+                } else if (y >= 290 && y <= 340) {
+                    selectDifficulty("Hard");
+                }
+            }
+        }
+
+        function selectDifficulty(difficulty) {
+            gameDifficulty = difficulty;
+            stopAllAudio();
+            switch(difficulty) {
+                case "Easy":
+                    questions = easyQuestions;
+                    backgroundColor = "white";
+                    gridColor = "rgba(0, 0, 0, 0.1)";
+                    textColor = "black";
+                    document.getElementById("easyAudio").play();
+                    break;
+                case "Medium":
+                    questions = mediumQuestions;
+                    backgroundColor = "white";
+                    gridColor = "rgba(0, 0, 0, 0.1)";
+                    textColor = "black";
+                    document.getElementById("mediumAudio").play();
+                    break;
+                case "Hard":
+                    questions = hardQuestions;
+                    backgroundColor = "black";
+                    gridColor = "rgba(255, 255, 255, 0.1)";
+                    textColor = "white";
+                    document.getElementById("hardAudio").play();
+                    break;
+            }
+            gameState = "quiz";
+            currentQuestionIndex = 0;
+            totalScore = 0; // Reset total score for new game
+            renderQuizQuestion();
+            startTimer(); // Start the timer for the first question
+        }
+
+        function renderQuizQuestion() {
+            if (currentQuestionIndex >= questions.length) {
+                gameState = "end";
+                clearInterval(timerInterval); // Stop the timer when the game ends
+                renderEndScreen();
+                return;
+            }
+
+            var question = questions[currentQuestionIndex];
+            questionScore = baseScore; // Reset question score for each new question
+
+            ctx.clearRect(0, 0, 400, 400);
+            drawGrid();
+            ctx.fillStyle = textColor;
+            ctx.font = "20px 'Impact', sans-serif";
+            ctx.fillText(question.question, 25, 75);
+            ctx.fillText(question.question2, 25, 100);
+
+            for (var i = 0; i < question.options.length; i++) {
+                drawQuizOption(50, 150 + i * 50, question.options[i], i);
+            }
+
+            drawTimer();
+            drawScore();
+            drawQuestionCounter();
+
+            if (popupAlpha > 0) {
+                drawPopup();
+                popupAlpha -= 0.02;
+            }
+        }
+
+        function drawQuizOption(x, y, text, index) {
+            ctx.fillStyle = "blue";
+            ctx.fillRect(x, y, 300, 40);
+            ctx.fillStyle = "white";
+            ctx.font = "17px Arial";
+            ctx.fillText(text, x + 10, y + 25);
+        }
+
+        function handleQuizClick(x, y) {
+            var question = questions[currentQuestionIndex];
+            for (var i = 0; i < question.options.length; i++) {
+                var optionY = 150 + i * 50;
+                if (x >= 50 && x <= 350 && y >= optionY && y <= optionY + 40) {
+                    handleAnswer(i);
+                }
+            }
+        }
+
+        function handleAnswer(selectedOption) {
+            var question = questions[currentQuestionIndex];
+            clearInterval(timerInterval); // Stop the timer when an answer is selected
+            if (selectedOption === question.answer) {
+                var pointsAwarded = timeLeft * questionScore / amountOfTimeToAnswer; // Award points based on time left
+                totalScore += pointsAwarded; // Add the current question score to the total score
+                showPopup("Correct!", "rgba(0, 128, 0, ");
+            } else {
+                showPopup("Incorrect!", "rgba(255, 0, 0, ");
+            }
+            currentQuestionIndex++;
+            startTimer(); // Restart the timer for the next question
+            renderQuizQuestion();
+        }
+
+        function showPopup(message, color) {
+            popupMessage = message;
+            popupColor = color;
+            popupAlpha = 1;
+        }
+
+        function drawPopup() {
+            ctx.fillStyle = `${popupColor}${popupAlpha})`;
+            ctx.fillRect(100, 150, 200, 100);
+            ctx.fillStyle = `rgba(255, 255, 255, ${popupAlpha})`;
+            ctx.font = "20px 'Impact', sans-serif";
+            ctx.fillText(popupMessage, 140, 200);
+        }
+
+        function drawTimer() {
+            ctx.fillStyle = timeLeft < 5 ? "red" : textColor; // Change color to red when time is running out
+            ctx.font = "30px 'Impact', sans-serif"; // Increase the font size for more impact
+            ctx.fillText("Time Left: " + timeLeft + "s", 100, 50); // Move the timer to a more prominent position
+        }
+
+        function drawScore() {
+            ctx.fillStyle = textColor;
+            ctx.font = "20px 'Impact', sans-serif";
+            ctx.fillText("Score: " + totalScore, 150, 30); // Use totalScore instead of questionScore
+        }
+
+        function drawQuestionCounter() {
+            var questionsAnswered = currentQuestionIndex;
+            var questionsLeft = questions.length - currentQuestionIndex;
+            ctx.fillStyle = textColor;
+            ctx.font = "20px 'Impact', sans-serif";
+            ctx.fillText("Answered: " + questionsAnswered + "/" + questions.length, 230, 370);
+        }
+
+        function startTimer() {
+            timeLeft = 10; // Reset the timer for each question
+            questionScore = baseScore; // Reset question score for each new question
+            timerInterval = setInterval(function() {
+                timeLeft--;
+                questionScore = baseScore - (10 - timeLeft) * scoreDecrement; // Decrease the question score over time
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    handleAnswer(-1); // Time ran out, treat as incorrect answer
+                }
+                if (gameState === "quiz") renderQuizQuestion();
+            }, 1000); // 1 second interval for the timer
+        }
+
+        function renderEndScreen() {
+            ctx.clearRect(0, 0, 400, 400);
+            backgroundColor = "white"; // Reset background color
+            gridColor = "rgba(0, 0, 0, 0.1)"; // Reset grid color
+            textColor = "black"; // Reset text color
+            drawGrid();
+            ctx.fillStyle = textColor;
+            ctx.font = "50px 'Impact', sans-serif";
+            ctx.fillText("Quiz Finished!", 50, 50);
+            ctx.font = "30px 'Impact', sans-serif";
+            ctx.fillText("Final Score: " + totalScore, 100, 100);
+            clearInterval(timerInterval); // Stop the timer
+            ctx.fillStyle = "blue";
+            ctx.fillRect(150, 200, 106, 50);
+            ctx.fillStyle = "white";
+            ctx.font = "19px Impact";
+            ctx.fillText("play again", 153, 230);
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, 400, 400);
+            drawGrid();
+            updateGrid();
+            if (gameState === "menu") renderMenu();
+            if (gameState === "difficultySelect") renderDifficultySelect();
+            if (gameState === "quiz") renderQuizQuestion();
+            if (gameState === "end") renderEndScreen();
+            requestAnimationFrame(animate); // Use requestAnimationFrame for smoother animations
+        }
+
+        function stopAllAudio() {
+            document.getElementById("easyAudio").pause();
+            document.getElementById("easyAudio").currentTime = 0;
+            document.getElementById("mediumAudio").pause();
+            document.getElementById("mediumAudio").currentTime = 0;
+            document.getElementById("hardAudio").pause();
+            document.getElementById("hardAudio").currentTime = 0;
+        }
+
+        canvas.addEventListener('click', handleCanvasClick);
+        animate(); // Start the animation loop
+    </script>
+</body>
+</html>
