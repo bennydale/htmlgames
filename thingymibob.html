@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive 3D Shapes with Erratic Lightning Bolt</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #000;
+            overflow: hidden;
+        }
+        canvas {
+            border: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="shapeCanvas"></canvas>
+    <script>
+        const shapeCanvas = document.getElementById('shapeCanvas');
+        const shapeCtx = shapeCanvas.getContext('2d');
+
+        function resizeCanvas() {
+            shapeCanvas.width = window.innerWidth;
+            shapeCanvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+
+        const shapeSize = Math.min(shapeCanvas.width, shapeCanvas.height) / 4;
+        let centerX = shapeCanvas.width / 2;
+        let centerY = shapeCanvas.height / 2;
+
+        let angleX = 0;
+        let angleY = 0;
+        let angleZ = 0;
+        let rotationSpeedX = 0.01;
+        let rotationSpeedY = 0.02;
+        let rotationSpeedZ = 0.015;
+
+        let isRotating = true;
+        let currentShape = 'cube';
+        let jitterAmount = 0;
+        let morphProgress = 0;
+        let morphDuration = 60;
+
+        const cubeVertices = [
+            {x: -1, y: -1, z: -1}, {x: 1, y: -1, z: -1}, {x: 1, y: 1, z: -1}, {x: -1, y: 1, z: -1},
+            {x: -1, y: -1, z: 1}, {x: 1, y: -1, z: 1}, {x: 1, y: 1, z: 1}, {x: -1, y: 1, z: 1}
+        ];
+
+        const pyramidVertices = [
+            {x: 0, y: -1, z: 0},    // Top
+            {x: -1, y: 1, z: -1},   // Base
+            {x: 1, y: 1, z: -1},
+            {x: 1, y: 1, z: 1},
+            {x: -1, y: 1, z: 1}
+        ];
+
+        const cubeEdges = [
+            [0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]
+        ];
+
+        const pyramidEdges = [
+            [0,1],[0,2],[0,3],[0,4],[1,2],[2,3],[3,4],[4,1]
+        ];
+
+        // Icosphere generation
+        function normalizeVertex(v) {
+            const length = Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+            return { x: v.x / length, y: v.y / length, z: v.z / length };
+        }
+
+        function generateIcosphere(subdivisions = 0) {
+            const t = (1 + Math.sqrt(5)) / 2;
+            let vertices = [
+                normalizeVertex({x: -1, y: t, z: 0}), normalizeVertex({x: 1, y: t, z: 0}),
+                normalizeVertex({x: -1, y: -t, z: 0}), normalizeVertex({x: 1, y: -t, z: 0}),
+                normalizeVertex({x: 0, y: -1, z: t}), normalizeVertex({x: 0, y: 1, z: t}),
+                normalizeVertex({x: 0, y: -1, z: -t}), normalizeVertex({x: 0, y: 1, z: -t}),
+                normalizeVertex({x: t, y: 0, z: -1}), normalizeVertex({x: t, y: 0, z: 1}),
+                normalizeVertex({x: -t, y: 0, z: -1}), normalizeVertex({x: -t, y: 0, z: 1})
+            ];
+
+            let faces = [
+                [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11],
+                [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+                [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
+                [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]
+            ];
+
+            return { vertices, faces };
+        }
+
+        const icosphere = generateIcosphere(0);
+        const icosphereVertices = icosphere.vertices;
+        const icosphereEdges = icosphere.faces.flatMap(face => [
+            [face[0], face[1]], [face[1], face[2]], [face[2], face[0]]
+        ]);
+
+        function rotatePoint(x, y, z) {
+            // Rotation around X-axis
+            let y1 = y * Math.cos(angleX) - z * Math.sin(angleX);
+            let z1 = y * Math.sin(angleX) + z * Math.cos(angleX);
+          
+            // Rotation around Y-axis
+            let x2 = x * Math.cos(angleY) + z1 * Math.sin(angleY);
+            let z2 = -x * Math.sin(angleY) + z1 * Math.cos(angleY);
+          
+            // Rotation around Z-axis
+            let x3 = x2 * Math.cos(angleZ) - y1 * Math.sin(angleZ);
+            let y3 = x2 * Math.sin(angleZ) + y1 * Math.cos(angleZ);
+          
+            return { x: x3, y: y3, z: z2 };
+        }
+
+        function morphPoint(start, end, progress) {
+            return {
+                x: start.x + (end.x - start.x) * progress,
+                y: start.y + (end.y - start.y) * progress,
+                z: start.z + (end.z - start.z) * progress
+            };
+        }
+
+        // Lightning bolt
+        let lightningBolt = [];
+        let lightningAngle = 0;
+        let lightningRotationSpeed = 0.05;
+
+        function generateLightningBolt() {
+            lightningBolt = [{ x: 0, y: -shapeSize }];
+            let y = -shapeSize * 0.8;
+            while (y < shapeSize) {
+                let lastPoint = lightningBolt[lightningBolt.length - 1];
+                let newX = lastPoint.x + (Math.random() - 0.5) * shapeSize * 0.5;
+                lightningBolt.push({ x: newX, y: y });
+                y += shapeSize * 0.2;
+            }
+        }
+
+        function rotateLightning() {
+            lightningAngle += lightningRotationSpeed;
+            if (Math.random() < 0.02) {
+                generateLightningBolt(); // Occasionally regenerate the bolt
+            }
+        }
+
+        function drawLightning() {
+            shapeCtx.strokeStyle = 'yellow';
+            shapeCtx.lineWidth = 2;
+            shapeCtx.beginPath();
+            lightningBolt.forEach((point, index) => {
+                const rotatedX = point.x * Math.cos(lightningAngle) - point.y * Math.sin(lightningAngle);
+                const rotatedY = point.x * Math.sin(lightningAngle) + point.y * Math.cos(lightningAngle);
+                const x = centerX + rotatedX;
+                const y = centerY + rotatedY;
+                if (index === 0) {
+                    shapeCtx.moveTo(x, y);
+                } else {
+                    shapeCtx.lineTo(x, y);
+                }
+            });
+            shapeCtx.stroke();
+        }
+
+        function drawShape() {
+            shapeCtx.clearRect(0, 0, shapeCanvas.width, shapeCanvas.height);
+            shapeCtx.lineWidth = 2;
+
+            if (currentShape === 'lightning') {
+                drawLightning();
+                return;
+            }
+
+            let vertices, edges;
+            if (currentShape === 'cube') {
+                vertices = cubeVertices;
+                edges = cubeEdges;
+                shapeCtx.strokeStyle = 'white';
+            } else if (currentShape === 'pyramid') {
+                vertices = pyramidVertices;
+                edges = pyramidEdges;
+                shapeCtx.strokeStyle = 'blue';
+            } else {
+                vertices = icosphereVertices;
+                edges = icosphereEdges;
+                shapeCtx.strokeStyle = 'green';
+            }
+
+            const jitterX = (Math.random() - 0.5) * jitterAmount;
+            const jitterY = (Math.random() - 0.5) * jitterAmount;
+
+            const rotatedVertices = vertices.map(v => {
+                let point = v;
+                if (morphProgress > 0 && morphProgress < 1) {
+                    const endShape = currentShape === 'icosphere' ? icosphereVertices : (currentShape === 'pyramid' ? pyramidVertices : cubeVertices);
+                    point = morphPoint(v, endShape[vertices.indexOf(v) % endShape.length], morphProgress);
+                }
+                const rotated = rotatePoint(point.x, point.y, point.z);
+                const scale = 400 / (4 + rotated.z);
+                return {
+                    x: centerX + rotated.x * shapeSize + jitterX,
+                    y: centerY + rotated.y * shapeSize + jitterY
+                };
+            });
+
+            edges.forEach(edge => {
+                shapeCtx.beginPath();
+                shapeCtx.moveTo(rotatedVertices[edge[0]].x, rotatedVertices[edge[0]].y);
+                shapeCtx.lineTo(rotatedVertices[edge[1]].x, rotatedVertices[edge[1]].y);
+                shapeCtx.stroke();
+            });
+        }
+
+        function animate() {
+            if (isRotating) {
+                if (currentShape === 'cube') {
+                    angleX += rotationSpeedX * (1 + Math.random() * 0.5);
+                    angleY += rotationSpeedY * (1 + Math.random() * 0.5);
+                    angleZ += rotationSpeedZ * (1 + Math.random() * 0.5);
+
+                    if (Math.random() < 0.01) rotationSpeedX *= -1;
+                    if (Math.random() < 0.01) rotationSpeedY *= -1;
+                    if (Math.random() < 0.01) rotationSpeedZ *= -1;
+                } else if (currentShape === 'icosphere') {
+                    angleX += 0.005;
+                    angleY += 0.007;
+                } else if (currentShape === 'lightning') {
+                    rotateLightning();
+                }
+            }
+
+            if (morphProgress < 1) {
+                morphProgress += 1 / morphDuration;
+            } else {
+                morphProgress = 1;
+            }
+            drawShape();
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            centerX = shapeCanvas.width / 2;
+            centerY = shapeCanvas.height / 2;
+        });
+
+        window.addEventListener('keydown', (event) => {
+            if (event.key === '1') {
+                currentShape = 'cube';
+                isRotating = true;
+                jitterAmount = 2;
+                morphProgress = 0;
+            } else if (event.key === '2') {
+                currentShape = 'pyramid';
+                isRotating = false;
+                jitterAmount = 4;
+                morphProgress = 0;
+            } else if (event.key === '3') {
+                currentShape = 'icosphere';
+                isRotating = true;
+                jitterAmount = 2;
+                morphProgress = 0;
+            } else if (event.key === '4') {
+                currentShape = 'lightning';
+                isRotating = true;
+                jitterAmount = 4;
+                morphProgress = 0;
+                generateLightningBolt();
+            }
+        });
+    </script>
+</body>
+</html>

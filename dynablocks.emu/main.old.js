@@ -1,5 +1,61 @@
-import * as THREE from 'three';
-const { AmmoPhysics, PhysicsLoader } = ENABLE3D
+import * as THREE from '/node_modules/three/build/three.module.js';
+
+// Ensure Ammo.js is loaded
+if (typeof Ammo !== 'undefined') {
+    // Initialize Ammo
+    Ammo().then(() => {
+        // Assuming AmmoPhysics is available globally after Ammo.js is loaded
+        const { AmmoPhysics, PhysicsLoader } = window.AmmoPhysics;
+
+        // Initialize AmmoPhysics
+        const physics = new AmmoPhysics();
+
+        // Your code to use physics with THREE.js
+        // Example:
+        const scene = new THREE.Scene();
+        // Add your objects and physics interactions here
+
+        // Rest of your code
+        let cameraMove = {
+            x: 0,
+            y: 0,
+            z: 0,
+        };
+
+        let buildmenu = true;
+
+        const camera = new THREE.PerspectiveCamera(75, 640 / 480, 0.1, 1000);
+
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(640, 480);
+        document.body.appendChild(renderer.domElement);
+
+        // add image to the dom
+        const img = document.createElement('img');
+        img.style.position = 'absolute';
+        // do not allow dragging the image
+        img.setAttribute('draggable', false);
+        img.style.zIndex = 1;    // if you still don't see the label, try uncommenting this
+        img.style.width = 100 + 'px';
+        img.style.top = (480 - 95 - 40) + 'px';
+        img.style.left = (640 - 100) + 'px';
+        img.src = 'camera_menu.png';
+        document.body.appendChild(img);
+
+        if (buildmenu == true) {
+            const bottomMenu = document.createElement('div');
+            bottomMenu.style.position = 'absolute';
+            bottomMenu.style.zIndex = 1;    // if you still don't see the label, try uncommenting this
+            // Add your bottomMenu styling and logic here
+        }
+
+        // Add your render loop and other logic here
+    }).catch((error) => {
+        console.error('Error initializing Ammo.js:', error);
+    });
+} else {
+    console.error('Ammo.js is not loaded.');
+}
 
 let cameraMove = {
     x: 0,

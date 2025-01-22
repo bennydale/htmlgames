@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LightDashDemo</title>
+</head>
+<body>
+<canvas id="myCanvas" width="400" height="400" style="cursor: none;"></canvas>
+
+<script>
+  var canvas = document.getElementById('myCanvas');
+  var ctx = canvas.getContext('2d');
+
+  const canvasWidth = canvas.width;
+  const canvasHeight = canvas.height;
+
+  // Load images
+  var img = new Image();
+  img.src = 'coolermat2.png';
+  var img2 = new Image();
+  img2.src = 'woodentable.jpg';
+
+  let flashlightX = canvasWidth * 2; 
+  let flashlightY = canvasHeight * 2;
+  const lightRadius = 50; // Set effective radius of light to 50 pixels
+
+  let spiders = [];
+  const spiderSpawnRate = 3000; // Spawn a spider every 3 seconds
+  const spiderRadius = 5;
+  const lightTimeToFlee = 2000; // Time in ms for a spider to flee from light
+  const maxVelocity = 2; // Maximum velocity for spiders
+  const cheeseEatingTime = 2000; // Time spiders spend eating cheese before fleeing
+
+  // Cheese properties
+  let cheeseSize = 30; // Initial size of the cheese (triangle)
+  const cheeseShrinkRate = 1; // Pixels per second per spider
+  let gameLost = false;
+
+  img.onload = function () {
+    // Draw the scene
+    function drawScene() {
+      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+      // Draw background
+      ctx.drawImage(img2, 0, 0, canvasWidth, canvasHeight);
+
+      // Draw flashlight
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(img, flashlightX - canvasWidth, flashlightY - canvasHeight, canvasWidth * 2, canvasHeight * 2);
+
+      // Draw spiders
+      for (let spider of spiders) {
+        drawSpider(spider);
+        moveSpider(spider);
+      }
+
+      // Clean up spiders that have left the canvas
+      spiders = spiders.filter(spider => spider.active);
+
+      // Draw triangle (cheese)
+      drawTriangle();
+
+      // Check if the game is lost
+      if (cheeseSize <= 5) {
+        gameLost = true;
+        displayGameOver();
+      }
+    }
+
+    // Draw triangle (cheese)
+    function drawTriangle() {
+      ctx.fillStyle = 'yellow';
+      const triangleX = canvasWidth / 2;
+      const triangleY = canvasHeight / 2;
+
+      ctx.beginPath();
+      ctx.moveTo(triangleX, triangleY - cheeseSize);
+      ctx.lineTo(triangleX - cheeseSize, triangleY + cheeseSize);
+      ctx.lineTo(triangleX + cheeseSize, triangleY + cheeseSize);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Draw a spider
+    function drawSpider(spider) {
+      if (spider.fleeingGreen) {
+        ctx.fillStyle = 'green'; // Spiders turn green when fleeing after eating
+      } else if (spider.inLight && spider.timeInLight < lightTimeToFlee) {
+        const flashFrequency = Math.max(10, 100 - (spider.timeInLight / lightTimeToFlee) * 100);
+        const shouldFlashRed = Math.floor(performance.now() / flashFrequency) % 2 === 0;
+        ctx.fillStyle = shouldFlashRed ? 'red' : 'black';
+      } else if (spider.inLight && spider.timeInLight >= lightTimeToFlee) {
+        ctx.fillStyle = 'red'; // Fully red before fleeing
+      } else {
+        ctx.fillStyle = 'black';
+      }
+
+      ctx.beginPath();
+      ctx.arc(spider.x, spider.y, spiderRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Move spiders with zigzag motion
+    function moveSpider(spider) {
+      if (spider.reachedCheese || gameLost) {
+        if (spider.reachedCheese) {
+          spider.cheeseEatingTimer += 16.67; // Increment eating timer
+          if (spider.cheeseEatingTimer >= cheeseEatingTime) {
+            spider.reachedCheese = false;
+            spider.fleeingGreen = true; // Start fleeing green
+            spider.speed = 3;
+            const dx = spider.x - canvasWidth / 2;
+            const dy = spider.y - canvasHeight / 2;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            spider.targetX = spider.x + (dx / distance) * canvasWidth; // Flee far away
+            spider.targetY = spider.y + (dy / distance) * canvasHeight;
+          } else {
+            cheeseSize -= cheeseShrinkRate / 60; // Shrink cheese
+            cheeseSize = Math.max(cheeseSize, 0);
+          }
+          return;
+        }
+        return;
+      }
+
+      const dx = canvasWidth / 2 - spider.x;
+      const dy = canvasHeight / 2 - spider.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // Stop spider if it reaches the cheese
+      if (!spider.inLight && distance < cheeseSize) {
+        spider.reachedCheese = true;
+        spider.cheeseEatingTimer = 0; // Reset eating timer
+        return;
+      }
+
+      // Normalize direction vector and calculate velocity
+      let vx = (dx / distance) * spider.speed;
+      let vy = (dy / distance) * spider.speed;
+
+      // Add zigzagging randomness to velocity
+      const zigzagOffset = Math.sin(spider.angle) * spider.zigzagIntensity;
+      spider.angle += Math.random() * 0.2 - 0.1; // Slight random variation in angle
+      vx += zigzagOffset * dy / distance;
+      vy += -zigzagOffset * dx / distance;
+
+      // Limit the velocity to the max velocity
+      const velocityMagnitude = Math.sqrt(vx * vx + vy * vy);
+      if (velocityMagnitude > maxVelocity) {
+        vx = (vx / velocityMagnitude) * maxVelocity;
+        vy = (vy / velocityMagnitude) * maxVelocity;
+      }
+
+      spider.x += vx;
+      spider.y += vy;
+
+      // Check if the light is hitting the spider
+      const lightDx = flashlightX - spider.x;
+      const lightDy = flashlightY - spider.y;
+      const lightDistance = Math.sqrt(lightDx * lightDx + lightDy * lightDy);
+      if (lightDistance < lightRadius) { // Effective light hit radius
+        spider.inLight = true;
+        spider.timeInLight += 16.67; // Assume 60fps
+        if (spider.timeInLight >= lightTimeToFlee) {
+          spider.fleeing = true;
+          spider.speed = 3;
+          spider.targetX = spider.x + (spider.x - canvasWidth / 2) * 2;
+          spider.targetY = spider.y + (spider.y - canvasHeight / 2) * 2;
+        }
+      } else {
+        spider.inLight = false;
+        spider.timeInLight = 0;
+      }
+
+      // If fleeing, move spider out of the screen
+      if (spider.fleeing || spider.fleeingGreen) {
+        const fleeDx = spider.targetX - spider.x;
+        const fleeDy = spider.targetY - spider.y;
+        const fleeDistance = Math.sqrt(fleeDx * fleeDx + fleeDy * fleeDy);
+        if (fleeDistance < 10) {
+          spider.active = false; // Mark spider as inactive once it leaves the screen
+        } else {
+          spider.x += (fleeDx / fleeDistance) * spider.speed;
+          spider.y += (fleeDy / fleeDistance) * spider.speed;
+        }
+      }
+    }
+
+    // Display game over message
+    function displayGameOver() {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+      ctx.fillStyle = 'white';
+      ctx.font = '30px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('Game Over!', canvasWidth / 2, canvasHeight / 2);
+    }
+
+    // Spawn spiders
+    setInterval(() => {
+      if (!gameLost) {
+        const angle = Math.random() * Math.PI * 2;
+        const spawnRadius = Math.max(canvasWidth, canvasHeight) * 1.2;
+        const spider = {
+          x: canvasWidth / 2 + Math.cos(angle) * spawnRadius,
+          y: canvasHeight / 2 + Math.sin(angle) * spawnRadius,
+          speed: 1,
+          timeInLight: 0,
+          fleeing: false,
+          fleeingGreen: false,
+          active: true,
+          reachedCheese: false,
+          inLight: false,
+          cheeseEatingTimer: 0,
+          angle: Math.random() * Math.PI * 2,
+          zigzagIntensity: 5 + Math.random() * 10, // Random zigzag intensity
+          targetX: null,
+          targetY: null
+        };
+        spiders.push(spider);
+      }
+    }, spiderSpawnRate);
+
+    // Update flashlight position on mousemove
+    canvas.addEventListener('mousemove', function (event) {
+      const rect = canvas.getBoundingClientRect();
+      flashlightX = event.clientX - rect.left;
+      flashlightY = event.clientY - rect.top;
+    });
+
+    // Game loop
+    function gameLoop() {
+      if (!gameLost) {
+        drawScene();
+      }
+      requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
+  };
+
+  img.onerror = function () {
+    console.error("Failed to load the mask image 'coolermat2.png'. Ensure the file exists and is accessible.");
+  };
+</script>
+</body>
+</html>

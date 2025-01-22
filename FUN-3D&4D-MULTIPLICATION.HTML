@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive 3D Multiplication Table</title>
+  <style>
+    body { margin: 0; padding: 0; background: #000; font-family: Arial, sans-serif; }
+    canvas { display: block; }
+    .controls { position: absolute; top: 10px; left: 10px; }
+    button { margin: 2px; padding: 5px 10px; }
+    #legend { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 10px; border-radius: 5px; }
+    #legend h3 { margin-top: 0; }
+    #legend div { margin: 5px 0; }
+    #problem-input { position: absolute; bottom: 10px; left: 10px; }
+    #problem-input input { padding: 5px; margin-right: 5px; }
+    #grid-size { position: absolute; bottom: 10px; right: 10px; }
+    #grid-size input { width: 100px; }
+    #grid-size label { color: white; }
+    #number-filters { position: absolute; top: 50px; right: 10px; }
+    #number-filters label { color: white; }
+  </style>
+</head>
+<body>
+  <canvas id="cubeCanvas"></canvas>
+  <div class="controls">
+    <button onclick="zoom(1.1)">Zoom In</button>
+    <button onclick="zoom(0.9)">Zoom Out</button>
+    <!--<button onclick="toggle4D()">4D mode</button>-->
+  </div>
+  
+  <div id="legend">
+    <h3>Color Legend</h3>
+    <div><span style="color: red;">●</span> Prime Numbers<input type="checkbox" id="showPrimes" checked onchange="toggleNumbers()"> </div>
+    <div><span style="color: blue;">●</span> Perfect Cubes<input type="checkbox" id="showCubes" checked onchange="toggleNumbers()"></div>
+    <div><span style="color: green;">●</span> Perfect Squares<input type="checkbox" id="showSquares" checked onchange="toggleNumbers()"></div>
+    <div><span style="color: white;">●</span> Other Numbers<input type="checkbox" id="showOthers" checked onchange="toggleNumbers()"></div>
+    <div><span styke="color: white;">●</span> Draw Grid<input type="checkbox" id="DrawGrid" checked onchange="toggleNumbers()"></div>
+  </div>
+
+  <script>
+    let showPrimes = true;
+    let showCubes = true;
+    let showSquares = true;
+    let showOthers = true;
+    let DrawGrid = true;
+
+    function toggleNumbers() {
+      showPrimes = document.getElementById('showPrimes').checked;
+      showCubes = document.getElementById('showCubes').checked;
+      showSquares = document.getElementById('showSquares').checked;
+      showOthers = document.getElementById('showOthers').checked;
+      DrawGrid = document.getElementById('DrawGrid').checked;
+      colorLookup.clear(); // Clear the color lookup when toggling numbers
+    }
+
+
+  </script>
+  
+  <!--make a slider to adjust the grid size-->  
+  <div id="grid-size">
+    <input type="range" id="gridSize" min="3" max="20" value="9" step="1" oninput="gridSize = this.value;"/>
+    <label for="gridSize">Grid Size</label>
+  </div>
+  
+  <div id="problem-input">
+    <input type="text" id="problem" placeholder="e.g., 5x2x7 or 4x3x8 or 12x15x8">
+    <button onclick="highlightProblem()">Highlight</button>
+  </div>
+  
+  <script>
+    // Pre-calculate prime numbers up to gridSize^3
+    const MAX_NUMBER = 20 * 20 * 20; // Assuming max gridSize is 20
+    const primes = new Set();
+    function calculatePrimes() {
+        const sieve = new Array(MAX_NUMBER + 1).fill(true);
+        sieve[0] = sieve[1] = false;
+        for (let i = 2; i <= Math.sqrt(MAX_NUMBER); i++) {
+            if (sieve[i]) {
+                for (let j = i * i; j <= MAX_NUMBER; j += i) {
+                    sieve[j] = false;
+                }
+            }
+        }
+        for (let i = 2; i <= MAX_NUMBER; i++) {
+            if (sieve[i]) primes.add(i);
+        }
+    }
+    calculatePrimes();
+
+    // Pre-calculate perfect squares and cubes
+    const perfectSquares = new Set();
+    const perfectCubes = new Set();
+    function calculatePerfectSquaresAndCubes() {
+        for (let i = 1; i * i <= MAX_NUMBER; i++) {
+            perfectSquares.add(i * i);
+            if (i * i * i <= MAX_NUMBER) {
+                perfectCubes.add(i * i * i);
+            }
+        }
+    }
+    calculatePerfectSquaresAndCubes();
+
+    // Pre-compute multiplication table
+    let multiplicationTable = [];
+    function computeMultiplicationTable(size) {
+        multiplicationTable = new Array(size);
+        for (let x = 0; x < size; x++) {
+            multiplicationTable[x] = new Array(size);
+            for (let y = 0; y < size; y++) {
+                multiplicationTable[x][y] = new Array(size);
+                for (let z = 0; z < size; z++) {
+                    multiplicationTable[x][y][z] = (x + 1) * (y + 1) * (z + 1);
+                }
+            }
+        }
+    }
+    const canvas = document.getElementById('cubeCanvas');
+    const ctx = canvas.getContext('2d');
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const focalLength = 10;
+    let distance = 20;
+    let cameraAngleX = 0;
+    let cameraAngleY = 0;
+    let gridSize = 9; // 1-9 for each axis
+
+    let isDragging = false;
+    let lastMouseX, lastMouseY;
+    let highlightedCells = [];
+    // Cache for rotated and projected vertices
+    let vertexCache = new Map();
+    // Color lookup table
+    const colorLookup = new Map();
+
+    function toggle4D(e){
+      if (gridSize == 9){
+        gridSize = 3;
+        //update the button text
+        e.target.innerHTML = "3D mode";
+        //update the problem input placeholder
+        document.getElementById('problem').placeholder = "e.g., 2x3x4x5 or 4x5x6x7";
+      } else {
+        gridSize = 9;
+        //update the button text
+        e.target.innerHTML = "4D mode";
+        //update the problem input placeholder
+        document.getElementById('problem').placeholder = "e.g., 5x2x7 or 4x3xx or 12x15x8";
+      }
+    }    
+    function getColor(product) {
+        if (colorLookup.has(product)) {
+            return colorLookup.get(product);
+        }
+        
+        let color;
+        if (primes.has(product)) color = showPrimes ? 'red' : 'transparent';
+        else if (perfectCubes.has(product)) color = showCubes ? 'blue' : 'transparent';
+        else if (perfectSquares.has(product)) color = showSquares ? 'green' : 'transparent';
+        else color = showOthers ? 'white' : 'transparent';
+        
+        colorLookup.set(product, color);
+        return color;
+    }
+    function createCube(x, y, z) {
+        const key = `${x},${y},${z}`;
+        if (vertexCache.has(key)) {
+            return vertexCache.get(key);
+        }
+        
+        const size = 0.5;
+        const vertices = [
+            [x-size, y-size, z-size], [x+size, y-size, z-size], [x+size, y+size, z-size], [x-size, y+size, z-size],
+            [x-size, y-size, z+size], [x+size, y-size, z+size], [x+size, y+size, z+size], [x-size, y+size, z+size]
+        ];
+        
+        vertexCache.set(key, vertices);
+        return vertices;
+    }
+
+    const edges = [
+      [0, 1], [1, 2], [2, 3], [3, 0],
+      [4, 5], [5, 6], [6, 7], [7, 4],
+      [0, 4], [1, 5], [2, 6], [3, 7]
+    ];
+
+    function rotatePoint(point) {
+        const key = `${point[0]},${point[1]},${point[2]},${cameraAngleX},${cameraAngleY}`;
+        if (vertexCache.has(key)) {
+            return vertexCache.get(key);
+        }
+        
+        let [x, y, z] = point;
+
+        let temp = x * Math.cos(cameraAngleY) + z * Math.sin(cameraAngleY);
+        z = -x * Math.sin(cameraAngleY) + z * Math.cos(cameraAngleY);
+        x = temp;
+
+        temp = y * Math.cos(cameraAngleX) - z * Math.sin(cameraAngleX);
+        z = y * Math.sin(cameraAngleX) + z * Math.cos(cameraAngleX);
+        y = temp;
+
+        const rotated = [x, y, z];
+        vertexCache.set(key, rotated);
+        return rotated;
+    }
+
+    function project(point) {
+      const rotated = rotatePoint(point);
+      const scale = focalLength / (focalLength + rotated[2] + distance);
+      const x = rotated[0] * scale;
+      const y = rotated[1] * scale;
+      return [x, y, rotated[2]];
+    }
+    
+    function drawCube(vertices, isHighlighted) {
+      if (!DrawGrid && !isHighlighted) {
+        return;
+      }
+      ctx.strokeStyle = isHighlighted ? 'yellow' : 'rgba(255, 255, 255, 0.3)';
+      ctx.lineWidth = isHighlighted ? 3 : 1;
+      ctx.beginPath();
+
+      edges.forEach(edge => {
+        const p1 = project(vertices[edge[0]]);
+        const p2 = project(vertices[edge[1]]);
+        if (p1[2] < -focalLength || p2[2] < -focalLength) {
+          return; // Skip drawing edges that are behind the camera
+        }
+        ctx.moveTo(p1[0] * 50 + canvas.width / 2, p1[1] * 50 + canvas.height / 2);
+        ctx.lineTo(p2[0] * 50 + canvas.width / 2, p2[1] * 50 + canvas.height / 2);
+      });
+
+      ctx.stroke();
+    }
+
+    function isPrime(num) {
+      if (num <= 1) return false;
+      for (let i = 2; i <= Math.sqrt(num); i++) {
+        if (num % i === 0) return false;
+      }
+      return true;
+    }
+
+    function isPerfectSquare(num) {
+      return Math.sqrt(num) % 1 === 0;
+    }
+
+    function isPerfectCube(num) {
+      return Math.cbrt(num) % 1 === 0;
+    }
+
+    function drawProduct(x, y, z, product) {
+      const center = project([x, y, z]);
+      const scale = focalLength / (focalLength + center[2] + distance);
+      
+      ctx.fillStyle = getColor(product);
+      ctx.font = `bold ${Math.max(8, 20 * scale)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(product, center[0] * 50 + canvas.width / 2, center[1] * 50 + canvas.height / 2);
+    }
+    function project(point) {
+        const rotated = rotatePoint(point);
+        const scale = focalLength / (focalLength + rotated[2] + distance);
+        const x = rotated[0] * scale;
+        const y = rotated[1] * scale;
+        return [x, y, rotated[2]];
+    }
+
+    function render() {
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        for (let x = 0; x < gridSize; x++) {
+            for (let y = 0; y < gridSize; y++) {
+                for (let z = 0; z < gridSize; z++) {
+                    const cube = createCube(x - gridSize/2 + 0.5, y - gridSize/2 + 0.5, z - gridSize/2 + 0.5);
+                    const isHighlighted = highlightedCells.some(cell => cell[0] === x && cell[1] === y && cell[2] === z);
+                    drawCube(cube, isHighlighted);
+                    const product = multiplicationTable[x][y][z];
+                    drawProduct(x - gridSize/2 + 0.5, y - gridSize/2 + 0.5, z - gridSize/2 + 0.5, product);
+                }
+            }
+        }
+    }
+
+    function animate() {
+      render();
+      requestAnimationFrame(animate);
+    }
+
+    function zoom(factor) {
+      distance /= factor;
+    }
+
+    function highlightProblem() {
+      const problem = document.getElementById('problem').value.toLowerCase();
+      const parts = problem.split('x');
+      if (parts.length !== 3) {
+        alert('Please enter a valid 3-part multiplication problem (e.g., 5x2x7 or 4x3xx or 12x15x8)');
+        return;
+      }
+
+      highlightedCells = [];
+      for (let x = 0; x < gridSize; x++) {
+        for (let y = 0; y < gridSize; y++) {
+          for (let z = 0; z < gridSize; z++) {
+            if (matchPart(parts[0], x + 1) &&
+              matchPart(parts[1], y + 1) &&
+              matchPart(parts[2], z + 1)) {
+              highlightedCells.push([x, y, z]);
+            }
+          }
+        }
+      }
+    }
+
+    function matchPart(part, value) {
+      if (part === '' || part === 'x') return true;
+      const num = parseInt(part);
+      return !isNaN(num) && num === value;
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        const deltaX = e.clientX - lastMouseX;
+        const deltaY = e.clientY - lastMouseY;
+
+        cameraAngleY -= deltaX * 0.01;
+        cameraAngleX += deltaY * 0.01;
+
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+      isDragging = false;
+    });
+
+    function updateGrid() {
+      gridSize = parseInt(document.getElementById('gridSize').value);
+      computeMultiplicationTable(gridSize);
+      vertexCache.clear(); // Clear the cache when grid size changes
+      colorLookup.clear(); // Clear the color lookup when grid size changes
+    }
+
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    });
+
+    // Initial setup
+    updateGrid();
+    animate();
+
+    // Add event listener for grid size changes
+    document.getElementById('gridSize').addEventListener('input', updateGrid);
+  </script>
+</body>
+</html>

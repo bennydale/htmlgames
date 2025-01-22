@@ -9,11 +9,11 @@
    ██║   ╚██████╔╝██║ ╚═╝ ██║██║████║    ███████╗ ╝██║  ██║  ███    ██║ ██╝  ██  ███████╗██████║██   ██   **A Play Vista Production**
    ╚═╝    ╚═════╝ ╚═╝     ╚═╝╚══════╝    ╚══════╝ ╚═════╝     ╚═████═══╝ ╚═╝  ╚═╝╚═════╝ ╚══════╝╚═╝  ╚═╝ **2024**   
    play this at play-vista.com 
-   // game by anthony dale castro
-   // thx to my dad for helping me with most of the code
-   // music from aztech challenge 1983 commodore 64
-   // i stole all of the sound effects
-   // i stole stock images and made the lowest quality graphics known to man
+   game by anthony dale castro
+   thx to my dad for helping me with most of the code
+   music from aztech challenge 1983 commodore 64
+   i stole all of the sound effects
+   i stole stock images and made the lowest quality graphics known to man
    */
    const canvas = document.getElementById("myCanvas");
   const ctx = canvas.getContext("2d");
@@ -158,6 +158,14 @@
           [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
           [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
           [1, 1, 1, 1, 1, 1, 1, 2, 1, 1]
+      ],
+      [
+          [1, 1, 1, 2, 1, 1, 1, 1, 1, 1],
+          [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+          [2, 0, 0, 0, 0, 0, 4, 0, 0, 1],
+          [1, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+          [1, 0, 0, 0, 4, 0, 1, 0, 0, 2],
+          [1, 2, 1, 1, 1, 1, 1, 1, 1, 1]
       ]
   ]
   // map consist of 5x5 rooms with hallways connecting them together
@@ -329,7 +337,7 @@
 
           // Function to check if a tile is walkable
           function isWalkable(x, y) {
-              return map[y] && map[y][x] !== 1;
+              return x >= 0 && y >= 0 && x < 75 && y < 75 && map[y][x] !== 1;
           }
 
           // Initial collision check

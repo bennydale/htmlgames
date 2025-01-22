@@ -25,7 +25,7 @@
 		var moveA = 11
 		var PADDLE_2_XPOS = 980
 		var PADDLE_1_XPOS = 15
-		var PADDLE_HEIGHT = 100
+		var PADDLE_HEIGHT = 50
 		var BALL_HEIGHT =10
 		var hitsoundaffect = new Audio('hitsoundaffect.wav');
 		var losingsound = new Audio( 'losingnoise.wav')
@@ -35,14 +35,14 @@
         var canvas = document.getElementById("firstCanvas");
         const context = canvas.getContext('2d');
 		
-		var paddle1 = 250
-		var paddle2 = 250
+		var paddle1 = 20
+		var paddle2 = 20
 		var ball = {
 			x: 500, 
 			y: 250
 		}
 
-		var curve = 1
+		var curve = 2
 		var p1Up = false
 		var p1Down = false
 		var p2Up = false

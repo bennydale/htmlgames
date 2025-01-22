@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AI Simulation Menu</title>
@@ -14,6 +16,70 @@
 <canvas id="gameCanvas" width="400" height="400"></canvas>
 
 <script>
+  // Define a simple neural network
+async function createModel() {
+    const model = tf.sequential();
+    model.add(tf.layers.dense({ units: 128, inputShape: [gridRows * gridCols], activation: 'relu' }));
+    model.add(tf.layers.dense({ units: 64, activation: 'relu' }));
+    model.add(tf.layers.dense({ units: 10, activation: 'softmax' })); // Assuming 10 unique labels (classes)
+
+    model.compile({
+        optimizer: 'adam',
+        loss: 'categoricalCrossentropy',
+        metrics: ['accuracy'],
+    });
+
+    return model;
+}
+
+// Convert grid data to tensor format for training
+function preprocessGridData(grids) {
+    const inputs = [];
+    const labels = [];
+    const uniqueLabels = Array.from(new Set(grids.map(item => item.name)));
+
+    grids.forEach(grid => {
+        const input = grid.grid.flat().map(cell => (cell ? 1 : 0)); // Flatten and convert to binary
+        const labelIndex = uniqueLabels.indexOf(grid.name);
+        const label = Array(uniqueLabels.length).fill(0);
+        label[labelIndex] = 1; // One-hot encode label
+
+        inputs.push(input);
+        labels.push(label);
+    });
+
+    return {
+        xs: tf.tensor2d(inputs),
+        ys: tf.tensor2d(labels),
+        labelMap: uniqueLabels,
+    };
+}
+
+// Train the neural network
+async function trainModel(model, grids) {
+    const { xs, ys } = preprocessGridData(grids);
+
+    await model.fit(xs, ys, {
+        epochs: 50,
+        shuffle: true,
+        callbacks: tf.callbacks.earlyStopping({ patience: 5 }),
+    });
+
+    xs.dispose();
+    ys.dispose();
+}
+
+// Predict function
+async function predict(model, inputGrid) {
+    const input = tf.tensor2d([inputGrid.flat().map(cell => (cell ? 1 : 0))], [1, gridRows * gridCols]);
+    const prediction = model.predict(input);
+    const predictedLabelIndex = prediction.argMax(1).dataSync()[0];
+
+    prediction.dispose();
+    input.dispose();
+
+    return predictedLabelIndex;
+}
 var canvas = document.getElementById('gameCanvas');
 var ctx = canvas.getContext('2d');
 var gridSize = 18; // Adjusted grid size for prompt space

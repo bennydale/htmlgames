@@ -19,19 +19,48 @@
 	<canvas id="raycastingCanvas" width="500" height="500" style="float:left;border:1px solid #000000"></canvas>
     <canvas id="fpmap" width="500" height="500" style="float:left;border:1px solid #000000"></canvas>
     <script>
+
+const viewAngle = 90;
+
+viewStartAngle = 270;
+                // Add this function for collision detection
+                function checkCollision(x, y, radius) {
+            const playerTileX = Math.floor(x / blockSize.x);
+            const playerTileY = Math.floor(y / blockSize.y);
+            
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    const tileX = playerTileX + dx;
+                    const tileY = playerTileY + dy;
+                    
+                    if (tileX >= 0 && tileX < map1[0].length && tileY >= 0 && tileY < map1.length) {
+                        if (map1[tileY][tileX] === '1') {
+                            const wallX = tileX * blockSize.x;
+                            const wallY = tileY * blockSize.y;
+                            
+                            if (x + radius > wallX && x - radius < wallX + blockSize.x &&
+                                y + radius > wallY && y - radius < wallY + blockSize.y) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        }
         const map1 =[
         "111111111111111111111111111111111111",
         "100100000000000011111100000000000001",
         "100100111111111110000100000100111111",
+        "100100000000000010000100000000000001",
+        "100111111111110010000000000000000001",
+        "100100000000000011111100000000000001",
+        "100100000000000010000100000000000001",
         "100100000000000010000100000100000001",
-        "100111111111110010000000000100000001",
-        "100100000000000011111100000100000001",
-        "100100111111111110000100000111110011",
-        "100100000000000010000100000100000001",
-        "100111111111110010000000000100000001",
-        "100000000000000011111100000111000111",
-        "100111111111111111111100000100000001",
-        "100000000000000000000000000100000001",
+        "100000000000000010000000000100000000",
+        "100000000000000011111100000000000000",
+        "100000000000000000000000000000000001",
+        "100000000000000000000000000000000001",
         "111111111111111111111111111111111111",   
         ]
         var moveAmount = 2;
@@ -39,6 +68,9 @@
         var padDown = false;
         var padLeft = false;
         var padRight = false;
+
+        let wallsNeedRedraw = true;
+
 
 
         let canvas = document.getElementById("raycastingCanvas");
@@ -65,14 +97,17 @@
             height:30,
             img: new Image()
         }
-        badguy1.img.src = 'data:image/png;base64,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'
-
+        /*
+        //badguy1.img.src = 'data:image/png;base64,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'
+        badguy1.img = new Image();
+        badguy1.img.crossOrigin = "Anonymous";
+        badguy1.img.src = 'enemy1.png';
         let viewStartAngle = 270;
         const viewAngle = 90
-
+        */
         let wall3dRayWidth = canvas3d.width /viewAngle;
 
-
+        
 
         // helper functions
         let degreeToRadian = function(degree) {
@@ -154,6 +189,51 @@
             this.dir = Vector.fromAngle(angle);
         };
 
+        function drawWalls(context) {
+          context.strokeStyle = 'rgba(0, 0, 0, 1)';
+          context.lineWidth = 1;
+
+          for (let wall of walls) {
+              context.beginPath();
+              context.moveTo(wall.a.x, wall.a.y);
+              context.lineTo(wall.b.x, wall.b.y);
+              context.stroke();
+          }
+          /*
+          // Draw the bad guy if it exists
+          if (badguy1 && badguy1.img) {
+              // Create a temporary canvas to handle transparency
+              let tempCanvas = document.createElement('canvas');
+              tempCanvas.width = badguy1.width;
+              tempCanvas.height = badguy1.height;
+              let tempCtx = tempCanvas.getContext('2d');
+
+              // Draw the image onto the temporary canvas
+              tempCtx.drawImage(badguy1.img, 0, 0, badguy1.width, badguy1.height);
+
+              // Get image data and process for transparency
+              let imageData = tempCtx.getImageData(0, 0, badguy1.width, badguy1.height);
+              let data = imageData.data;
+              for (let i = 0; i < data.length; i += 4) {
+                  if (data[i] === 255 && data[i + 1] === 0 && data[i + 2] === 255) {
+                      data[i + 3] = 0; // Set alpha to 0 for magenta pixels
+                  }
+              }
+              tempCtx.putImageData(imageData, 0, 0);
+
+              // Draw the processed image onto the main canvas
+              context.drawImage(tempCanvas, badguy1.x, badguy1.y);
+
+              // Add the bad guy to the walls array for raycasting
+              walls.push(new Boundary(
+                  new Vector(badguy1.x, badguy1.y),
+                  new Vector(badguy1.x + badguy1.width, badguy1.y),
+                  badguy1
+              ));
+              */
+          }
+      
+
         /* test line used to show position a distribution of rays
         Ray.prototype.draw = function(ctx) {
         ctx.translate(this.pos.x, this.pos.y);
@@ -212,67 +292,86 @@
             }
         };
 
+        // Update the Particle.prototype.look function to handle transparency
         Particle.prototype.look = function(ctx, walls) {
-            wall3dRayWidth = canvas3d.width/ this.rays.length
-            for (let i = 0; i < this.rays.length; i++) {
+            wall3dRayWidth = canvas3d.width / this.rays.length;
+            let ch = canvas3d.height;
+            let maxHeight = ch * 1.5;
 
-                let pt;
-                let curretWall = null;
+            for (let i = 0; i < this.rays.length; i++) {
                 let closest = null;
                 let record = Infinity;
+                let curretWall = null;
+                let closestBg, distBg;
 
-                for (let j = 0; j < walls.length; j++) {
-
-                    pt = this.rays[i].cast(walls[j]);
-
+                for (let wall of walls) {
+                    const pt = this.rays[i].cast(wall);
                     if (pt) {
                         const dist = Vector.dist(this.pos, pt);
-                        if (dist < record && !walls[j].imgObj) {
+                        if (dist < record) {
                             record = dist;
                             closest = pt;
-                        }
-                        if (dist < record && walls[j].imgObj) {
-                            curretWall = walls[j];
-                            closestBg = pt
-                            distBg = dist;
+                            if (wall.imgObj) {
+                                curretWall = wall;
+                                closestBg = pt;
+                                distBg = dist;
+                            }
                         }
                     }
                 }
 
-                let ch = canvas3d.height;
-                let dist= getDistance(this.pos.x, this.pos.y, closest.x, closest.y)
-                let height =canvas3d.height -(dist*1.5)
                 if (closest) {
+                    // Draw ray (optional, can be commented out for performance)
                     ctx.beginPath();
                     ctx.moveTo(this.pos.x, this.pos.y);
                     ctx.lineTo(closest.x, closest.y);
                     ctx.strokeStyle = 'rgba(50, 80, 100, .4)';
                     ctx.stroke();
 
-                    // draw wall in 3d
-                    if( height < 2 ){
-                        height = 2;
-                    }
-                    
-                    //height+= Math.abs((viewAngle/2)-i)
-                   
-                    cx3d.beginPath();
-                    cx3d.lineWidth = wall3dRayWidth+1
-                    // debugger;
-                    cx3d.moveTo( i*wall3dRayWidth, ch/2 - (height/2))
-                    cx3d.lineTo(i*(wall3dRayWidth),ch/2 + (height/2));
-                    cx3d.strokeStyle = 'rgba(50, 50, ' +( 0+(height/2))+', .5)';
-                    cx3d.stroke();
-                }
+                    // Calculate wall height
+                    let rayAngle = Math.atan2(closest.y - this.pos.y, closest.x - this.pos.x);
+                    let viewingAngle = degreeToRadian(viewStartAngle);
+                    let deltaAngle = rayAngle - viewingAngle;
+                    deltaAngle = Math.atan2(Math.sin(deltaAngle), Math.cos(deltaAngle));
+                    let correctedDist = record * Math.cos(deltaAngle);
+                    let height = Math.min((ch / correctedDist) * 50, maxHeight);
+                    height = Math.max(height, 2);
 
-                if(curretWall && curretWall.imgObj){
-                    let bgHeight = (canvas3d.height - distBg)/2
-                    let xCrop = closestBg.x - curretWall.a.x
-                    
-                    cx3d.drawImage(curretWall.imgObj.img,
-                        xCrop, 0, 2, curretWall.imgObj.height,
-                        i*wall3dRayWidth,  ch/2 - (bgHeight/4), 1, (bgHeight) 
-                    )
+                    // Draw wall
+                    cx3d.beginPath();
+                    cx3d.moveTo(i * wall3dRayWidth, ch / 2 - (height / 2));
+                    cx3d.lineTo(i * wall3dRayWidth, ch / 2 + (height / 2));
+                    cx3d.strokeStyle = `rgba(50, 50, ${Math.min(255, height)}, 0.5)`;
+                    cx3d.stroke();
+
+                    // Handle sprite (enemy) rendering with transparency
+                    if (curretWall && curretWall.imgObj) {
+                        let bgHeight = Math.min((ch / (distBg * Math.cos(deltaAngle))) * 50, maxHeight);
+                        let xCrop = closestBg.x - curretWall.a.x;
+
+                        // Create a temporary canvas for the sprite slice
+                        let tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = 1;
+                        tempCanvas.height = curretWall.imgObj.height;
+                        let tempCtx = tempCanvas.getContext('2d');
+
+                        // Draw the sprite slice onto the temporary canvas
+                        tempCtx.drawImage(curretWall.imgObj.img, xCrop, 0, 1, curretWall.imgObj.height, 0, 0, 1, curretWall.imgObj.height);
+
+                        // Get image data and process for transparency
+                        let imageData = tempCtx.getImageData(0, 0, 1, curretWall.imgObj.height);
+                        let data = imageData.data;
+                        for (let j = 0; j < data.length; j += 4) {
+                            if (data[j] === 255 && data[j + 1] === 0 && data[j + 2] === 255) {
+                                data[j + 3] = 0; // Set alpha to 0 for magenta pixels
+                            }
+                        }
+                        tempCtx.putImageData(imageData, 0, 0);
+
+                        // Draw the processed sprite slice
+                        cx3d.drawImage(tempCanvas, 0, 0, 1, curretWall.imgObj.height,
+                            i * wall3dRayWidth, ch / 2 - (bgHeight / 2), wall3dRayWidth, bgHeight);
+                    }
                 }
             }
         };
@@ -307,7 +406,67 @@
         */
         const radius = 5;
         const blockSize = {x:context.canvas.width/map1[0].length, y:context.canvas.height/map1.length}
-   
+
+        function createWalls() {
+          walls = [];
+          const blockSize = {
+              x: context.canvas.width / map1[0].length,
+              y: context.canvas.height / map1.length
+          };
+
+          function drawWalls(context) {
+            context.strokeStyle = 'rgba(0, 0, 0, 1)';
+            context.lineWidth = 1;
+
+            for (let wall of walls) {
+                context.beginPath();
+                context.moveTo(wall.a.x, wall.a.y);
+                context.lineTo(wall.b.x, wall.b.y);
+                context.stroke();
+            }
+
+            // Draw the bad guy if it exists
+            if (badguy1 && badguy1.img) {
+              context.drawImage(
+                  badguy1.img, 
+                  badguy1.x, 
+                  badguy1.y, 
+                  badguy1.width, 
+                  badguy1.height
+              );
+
+              // Add the bad guy to the walls array for raycasting
+              walls.push(new Boundary(
+                  new Vector(badguy1.x, badguy1.y),
+                  new Vector(badguy1.x + badguy1.width, badguy1.y),
+                  badguy1
+              ));
+            }
+          }
+
+          map1.forEach((row, rowInx) => {
+              let penStart = null;
+              for (let i = 0; i <= row.length; i++) {
+                  if (row[i] === '1' && penStart === null) {
+                      penStart = i;
+                  } else if ((row[i] === '0' || i === row.length) && penStart !== null) {
+                      walls.push(
+                          new Boundary(
+                              new Vector(penStart * blockSize.x, blockSize.y * rowInx),
+                              new Vector(i * blockSize.x, blockSize.y * rowInx)
+                          )
+                      );
+                      walls.push(
+                          new Boundary(
+                              new Vector(i * blockSize.x, blockSize.y * rowInx),
+                              new Vector(i * blockSize.x, blockSize.y * (rowInx + 1))
+                          )
+                      );
+                      penStart = null;
+                  }
+              }
+          });
+        }
 
         map1.forEach((row,rowInx) =>{
             let penStart = penStop = null;
@@ -359,71 +518,25 @@
         // main loop
        
         let main = function() {
-            positionPlayer();
-            context.clearRect(0, 0, canvasWidth, canvasHeight);
-            context.fillStyle = "white";
-            context.fillRect(0, 0, canvasWidth, canvasHeight);
+        positionPlayer();
+        context.clearRect(0, 0, canvasWidth, canvasHeight);
+        cx3d.clearRect(0, 0, canvasWidth, canvasHeight);
+        
+        // Pre-calculate common values
+        let ch = canvas3d.height;
+        let maxHeight = ch * 1.5;
+        
+        // Draw walls and bad guy
+        drawWalls(context);
+        
+        // Update and draw particle
+        particle.update(player.x, player.y);
+        particle.look(context, walls, ch, maxHeight);
+        particle.draw(context);
 
-            cx3d.clearRect(0, 0, canvasWidth, canvasHeight);
-            cx3d.fillStyle = "white";
-            cx3d.fillRect(0, 0, canvasWidth, canvasHeight);            
-            // check for player collision: 
-            map1.forEach((row,col) =>{
-                for(var i=0;i<row.length;i++){
-                    if(row.charAt(i)== "1"){
-                        // check if player colided with this box
-                        if( player.x +radius >blockSize.x*i && player.x - radius< (blockSize.x*i)+ blockSize.x 
-                            &&
-                            player.y + radius >blockSize.y*col && player.y- radius < (blockSize.y*col)+ blockSize.y 
-                        ){
-                            alpah =degreeToRadian(viewStartAngle)
-                            if(padUp){
-                                player.y -= (moveAmount * Math.sin(alpah))
-                                player.x -= (moveAmount * Math.cos(alpah))
-                            }
-                            if(padDown){
-                                player.y += (moveAmount * Math.sin(alpah))
-                                player.x += (moveAmount * Math.cos(alpah))
-                            }
-                        }
-
-                        // check bad guy collided: 
-                        if( badguy1.x +badguy1.width >blockSize.x*i
-                            &&
-                            badguy1.y >blockSize.y*col
-                        ){
-                            badguy1.y -= 2
-                            badguy1.x -= 2
-                        }
-                        if(  badguy1.x - badguy1.width< (blockSize.x*i)+ blockSize.x 
-                            && 
-                            badguy1.y < (blockSize.y*col)+ blockSize.y 
-                        ){
-                            badguy1.y += 2
-                            badguy1.x += 2
-                        }
-                    }
-                }
-            })
-            // add the bad guys to the walls:
-            walls.push( new Boundary(
-                new Vector(badguy1.x, badguy1.y),
-                new Vector(badguy1.x+badguy1.width,badguy1.y),
-                badguy1
-            ))
-
-            for (let i = 0; i < walls.length; i++) {
-                walls[i].draw(context);
-            }
-
-            particle.update(player.x, player.y); // moves particle
-            particle.draw(context); // draws particle
-            particle.look(context, walls); // draws rays
-
-
-
-            window.requestAnimationFrame(main);
-        };
+        // Use requestAnimationFrame for smoother animation
+        requestAnimationFrame(main);
+      };
         if( badguy1.img.complete ){
             main();
         } else{
@@ -440,63 +553,73 @@
         function calculateXYBasedOnAngle(){
 
         }
-        function positionPlayer(){
-            alpah =degreeToRadian(viewStartAngle)
-            if(padUp){
-                player.y += (moveAmount * Math.sin(alpah))
-                player.x += (moveAmount * Math.cos(alpah))
-            }
-            if(padDown){
-                player.y -= (moveAmount * Math.sin(alpah))
-                player.x -= (moveAmount * Math.cos(alpah))
-            }
-            if(padLeft){
-                viewStartAngle -= moveAmount
-            }
-            if(padRight){
-                viewStartAngle += moveAmount
+      // Update the positionPlayer function
+      function positionPlayer() {
+        const alpha = degreeToRadian(viewStartAngle);
+        let newX = player.x;
+        let newY = player.y;
+
+        if (padUp) {
+            newX += moveAmount * Math.cos(alpha);
+            newY += moveAmount * Math.sin(alpha);
+        }
+        if (padDown) {
+            newX -= moveAmount * Math.cos(alpha);
+            newY -= moveAmount * Math.sin(alpha);
+        }
+
+        // Check collision before updating player position
+        if (!checkCollision(newX, newY, radius)) {
+            player.x = newX;
+            player.y = newY;
+        }
+
+        if (padLeft) {
+            viewStartAngle -= moveAmount;
+        }
+        if (padRight) {
+            viewStartAngle += moveAmount;
+        }
+
+        // Normalize viewStartAngle to keep it between 0 and 360
+        viewStartAngle = (viewStartAngle + 360) % 360;
+    }
+
+      window.addEventListener("keydown", pressedKey);
+        function pressedKey(event) {
+            switch (event.key) {
+                case "ArrowUp":
+                    padUp = true;
+                    break;
+                case "ArrowDown":
+                    padDown = true;
+                    break;
+                case "ArrowLeft":
+                    padLeft = true;
+                    break;
+                case "ArrowRight":
+                    padRight = true;
+                    break;
             }
         }
-        window.addEventListener("keydown", pressedKey);
-		function pressedKey() {
-			directionVar = event.key.replace("Arrow", "");
-			switch (directionVar) {
-				case "Up":
-                	padUp = true
-				break;
-				case "Down":
-                	padDown = true
-				break;
-                case "Left":
-                	padLeft = true
-				break;
-				case "Right":
-                	padRight = true
-				break;
-			}
-		}
         window.addEventListener("keyup", pressedKeyUp);
-		function pressedKeyUp() {
-			directionVar = event.key.replace("Arrow", "");
-			switch (directionVar) {
-				case "Up":
-                    padUp = false
-				break;
-				case "Down":
-                    padDown = false
-				break;
-                case "Left":
-                	padLeft = false
-				break;
-				case "Right":
-                	padRight = false
-				break;
-                case " ":
-                    fAttached = false;
-                    fCooldown = 10
-                    break;
-			}
-		}
+          function pressedKeyUp(event) {
+              switch (event.key) {
+                  case "ArrowUp":
+                      padUp = false;
+                      break;
+                  case "ArrowDown":
+                      padDown = false;
+                      break;
+                  case "ArrowLeft":
+                      padLeft = false;
+                      break;
+                  case "ArrowRight":
+                      padRight = false;
+                      break;
+              }
+          }
+
         </script>
 </body>
 </html>
