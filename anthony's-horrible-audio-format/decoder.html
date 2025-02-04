@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Super Slow Sound Decoder</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background-color: black;
+    }
+    canvas {
+      display: block;
+    }
+    #upload-container {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+<div id="upload-container">
+  <label for="fileInput" style="color: white;">Upload Visualization: </label>
+  <input type="file" id="fileInput" accept="image/*">
+</div>
+<canvas id="decoderCanvas"></canvas>
+
+<script>
+  function startDecoder() {
+    const canvas = document.getElementById("decoderCanvas");
+    const ctx = canvas.getContext("2d");
+
+    let audioSamples = []; // Reconstructed audio samples
+    let isPlaying = false; // Playback state
+    let totalFrames = 0; // Total number of frames (bars)
+    const frameRate = 500; // 500ms per frame (extremely slow)
+
+    const fileInput = document.getElementById("fileInput");
+    fileInput.addEventListener("change", (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const image = new Image();
+          image.onload = () => {
+            // Adjust canvas size to match image dimensions
+            canvas.width = image.width;
+            canvas.height = image.height;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+            // Decode audio samples
+            audioSamples = decodeVisualizedAudio(ctx, canvas);
+
+            // Calculate total frames (bars)
+            totalFrames = canvas.width;
+
+            if (audioSamples.length > 0) {
+              drawPlayhead(); // Start playhead animation
+            }
+          };
+          image.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    function decodeVisualizedAudio(ctx, canvas) {
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const pixelData = imageData.data;
+
+      const samples = [];
+      const barWidth = 1; // Each bar corresponds to one sample
+
+      for (let x = 0; x < canvas.width; x += barWidth) {
+        const red = pixelData[(x * 4)]; // Red channel
+        const green = pixelData[(x * 4) + 1]; // Green channel
+        const blue = pixelData[(x * 4) + 2]; // Blue channel
+
+        // Map RGB values to a normalized range [-1, 1]
+        const lowFrequency = red / 255;
+        const midFrequency = green / 255;
+        const highFrequency = blue / 255;
+
+        const sample = (lowFrequency + midFrequency + highFrequency) / 3;
+        samples.push(sample * 2 - 1);
+      }
+
+      console.log("Decoded audio samples:", samples);
+      return samples;
+    }
+
+    function drawPlayhead() {
+      let playheadX = 0; // Start at the left edge
+      const playheadWidth = 2; // Width of the playhead line
+
+      function animatePlayhead() {
+        if (!isPlaying) return;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(fileInput.files[0], 0, 0, canvas.width, canvas.height);
+
+        // Draw playhead
+        ctx.fillStyle = "red";
+        ctx.fillRect(playheadX, 0, playheadWidth, canvas.height);
+
+        playheadX += 1; // Move playhead super slowly (1 pixel at a time)
+
+        if (playheadX > canvas.width) {
+          playheadX = 0;
+          isPlaying = false; // Stop when the playhead reaches the end
+        }
+
+        setTimeout(() => requestAnimationFrame(animatePlayhead), frameRate); // Slow playback
+      }
+
+      animatePlayhead();
+    }
+
+    function playDecodedAudio(samples) {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const buffer = audioContext.createBuffer(1, samples.length, audioContext.sampleRate);
+      const channelData = buffer.getChannelData(0);
+
+      for (let i = 0; i < samples.length; i++) {
+        channelData[i] = samples[i];
+      }
+
+      const source = audioContext.createBufferSource();
+      source.buffer = buffer;
+
+      // Calculate playback speed based on total frames and frame rate
+      const playbackSpeed = samples.length / (totalFrames * (frameRate / 1000));
+      source.playbackRate.value = playbackSpeed * 0.002; // Slow playback significantly
+      source.connect(audioContext.destination);
+      source.start();
+
+      isPlaying = true; // Start playback state
+      drawPlayhead(); // Start playhead animation
+    }
+
+    // Add a "Play" button for convenience
+    const playButton = document.createElement("button");
+    playButton.textContent = "Play";
+    playButton.style.position = "absolute";
+    playButton.style.top = "10px";
+    playButton.style.left = "300px";
+    playButton.style.zIndex = 10;
+    playButton.onclick = () => {
+      if (audioSamples.length > 0 && !isPlaying) {
+        playDecodedAudio(audioSamples);
+      }
+    };
+
+    document.body.appendChild(playButton);
+  }
+
+  startDecoder();
+</script>
+</body>
+</html>

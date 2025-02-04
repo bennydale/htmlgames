@@ -22,6 +22,7 @@
   let flashlightX = canvasWidth * 2; 
   let flashlightY = canvasHeight * 2;
   const lightRadius = 50; // Set effective radius of light to 50 pixels
+  var lightOn = false;
 
   let spiders = [];
   const spiderSpawnRate = 3000; // Spawn a spider every 3 seconds
@@ -38,17 +39,25 @@
   img.onload = function () {
     // Draw the scene
     function drawScene() {
+      // left mouse button down for flashlight
+      canvas.addEventListener('mousedown', function (event) {
+        if (event.button === 0) {
+          lightOn = true;
+        }
+      });
+      // left mouse button up for flashlight
+      canvas.addEventListener('mouseup', function (event) {
+        if (event.button === 0) {
+          lightOn = false;
+        }
+      });
       ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
       // Draw background
       ctx.drawImage(img2, 0, 0, canvasWidth, canvasHeight);
 
-      // Draw flashlight
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.drawImage(img, flashlightX - canvasWidth, flashlightY - canvasHeight, canvasWidth * 2, canvasHeight * 2);
-
-      // Draw spiders
-      for (let spider of spiders) {
+            // Draw spiders
+            for (let spider of spiders) {
         drawSpider(spider);
         moveSpider(spider);
       }
@@ -59,11 +68,31 @@
       // Draw triangle (cheese)
       drawTriangle();
 
-      // Check if the game is lost
-      if (cheeseSize <= 5) {
+
+
+      // Draw flashlight
+      if (lightOn) {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.drawImage(img, flashlightX - canvasWidth, flashlightY - canvasHeight, canvasWidth * 2, canvasHeight * 2);
+      } else {
+        // draw a slightly transperent black rectangle over the screen to simulate darkness
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+        // make a single white pixel as the cursor
+        ctx.fillStyle = 'gray';
+        ctx.fillRect(flashlightX, flashlightY, 2, 2);
+
+
+      }
+
+            // Check if the game is lost
+            if (cheeseSize <= 5) {
         gameLost = true;
         displayGameOver();
       }
+
+      score();
+
     }
 
     // Draw triangle (cheese)
@@ -78,6 +107,14 @@
       ctx.lineTo(triangleX + cheeseSize, triangleY + cheeseSize);
       ctx.closePath();
       ctx.fill();
+    }
+
+    function score() {
+      ctx.fillStyle = 'grey';
+      ctx.font = '20px Arial';
+      // make the score increase slowly over time
+      ctx.fillText('Score: ' + Math.floor(performance.now() / 1000), 10, 30);
+      
     }
 
     // Draw a spider
@@ -154,17 +191,22 @@
       spider.y += vy;
 
       // Check if the light is hitting the spider
-      const lightDx = flashlightX - spider.x;
-      const lightDy = flashlightY - spider.y;
-      const lightDistance = Math.sqrt(lightDx * lightDx + lightDy * lightDy);
-      if (lightDistance < lightRadius) { // Effective light hit radius
-        spider.inLight = true;
-        spider.timeInLight += 16.67; // Assume 60fps
-        if (spider.timeInLight >= lightTimeToFlee) {
-          spider.fleeing = true;
-          spider.speed = 3;
-          spider.targetX = spider.x + (spider.x - canvasWidth / 2) * 2;
-          spider.targetY = spider.y + (spider.y - canvasHeight / 2) * 2;
+      if (lightOn) {
+        const lightDx = flashlightX - spider.x;
+        const lightDy = flashlightY - spider.y;
+        const lightDistance = Math.sqrt(lightDx * lightDx + lightDy * lightDy);
+        if (lightDistance < lightRadius) { // Effective light hit radius
+          spider.inLight = true;
+          spider.timeInLight += 16.67; // Assume 60fps
+          if (spider.timeInLight >= lightTimeToFlee) {
+        spider.fleeing = true;
+        spider.speed = 3;
+        spider.targetX = spider.x + (spider.x - canvasWidth / 2) * 2;
+        spider.targetY = spider.y + (spider.y - canvasHeight / 2) * 2;
+          }
+        } else {
+          spider.inLight = false;
+          spider.timeInLight = 0;
         }
       } else {
         spider.inLight = false;

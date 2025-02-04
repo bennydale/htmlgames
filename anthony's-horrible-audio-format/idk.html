@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Audio Visualizer with Playhead, User‑Chosen Bar Width & Adjustable Duration</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      background-color: black;
+      overflow: auto;
+    }
+    /* Container that holds both canvases. Its position is relative so that child absolute elements
+       (the playhead canvas) are positioned relative to it. */
+    #canvasContainer {
+      position: relative;
+      display: inline-block;
+    }
+    /* The main canvas shows the waveform and header */
+    #visualizerCanvas {
+      display: block;
+    }
+    /* The playhead canvas overlays the main canvas */
+    #playheadCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 2;
+      pointer-events: none;
+    }
+    /* UI controls */
+    button, label, input {
+      position: absolute;
+      z-index: 10;
+      padding: 10px;
+      font-size: 16px;
+    }
+    #captureButton { top: 10px; left: 10px; }
+    #playButton   { top: 10px; left: 150px; }
+    #saveButton   { top: 10px; left: 290px; }
+    label[for="imageLoader"] { top: 10px; left: 430px; background-color: #ddd; cursor: pointer; }
+    #durationLabel { top: 10px; left: 550px; background-color: #ddd; }
+    #durationInput { top: 10px; left: 750px; width: 60px; }
+    #barWidthLabel { top: 10px; left: 830px; background-color: #ddd; }
+    #barWidthInput { top: 10px; left: 980px; width: 60px; }
+    input[type="file"] { display: none; }
+  </style>
+</head>
+<body>
+  <!-- Canvas container wrapping both canvases -->
+  <div id="canvasContainer">
+    <canvas id="visualizerCanvas"></canvas>
+    <canvas id="playheadCanvas"></canvas>
+  </div>
+
+  <!-- Buttons and Inputs -->
+  <button id="captureButton">Capture and Render</button>
+  <button id="playButton" disabled>Play</button>
+  <button id="saveButton">Save Image</button>
+  <label for="imageLoader">Load Image</label>
+  <input type="file" id="imageLoader" accept="image/*" />
+  <label id="durationLabel" for="durationInput">Recording Duration (s):</label>
+  <input type="number" id="durationInput" value="30" min="1" />
+  <label id="barWidthLabel" for="barWidthInput">Bar Width (px):</label>
+  <input type="number" id="barWidthInput" value="10" min="1" />
+
+<script>
+async function startVisualizer() {
+  const canvas = document.getElementById("visualizerCanvas");
+  const ctx = canvas.getContext("2d");
+  const playheadCanvas = document.getElementById("playheadCanvas");
+  const playheadCtx = playheadCanvas.getContext("2d");
+
+  const captureButton = document.getElementById("captureButton");
+  const playButton = document.getElementById("playButton");
+  const saveButton = document.getElementById("saveButton");
+  const imageLoader = document.getElementById("imageLoader");
+  const durationInput = document.getElementById("durationInput");
+  const barWidthInput = document.getElementById("barWidthInput");
+
+  // ─── CONSTANTS ──────────────────────────────────────────────
+  const headerWidth = 10;      // leftmost 10 columns reserved for header metadata
+  const frameRate = 44;        // capture a frame every 44 ms
+  const canvasHeight = 900;    // fixed canvas height
+
+  // The canvas width will be:
+  //    canvas.width = headerWidth + (framesToCapture * barWidth)
+  // where framesToCapture is determined by the recording duration,
+  // and barWidth is provided by the user.
+  
+  let audioContext, analyser, microphone, dataArray;
+  let capturing = false;
+  const capturedFrames = [];
+  let currentBarWidth = 10; // user‑chosen bar width (updated on capture)
+
+  // ─── SET UP AUDIO INPUT ─────────────────────────────────────
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioContext.createAnalyser();
+    microphone = audioContext.createMediaStreamSource(stream);
+    microphone.connect(analyser);
+    analyser.fftSize = 2048; // number of audio samples per frame
+    dataArray = new Uint8Array(analyser.fftSize);
+  } catch (err) {
+    console.error("Microphone access denied or not available:", err);
+    alert("Microphone access is required. Please allow access and refresh the page.");
+    return;
+  }
+  const sampleRate = audioContext.sampleRate; // for playback
+
+  // ─── DRAW THE FULL‑VERTICAL HEADER BARCODE ─────────────────────
+  // We encode 18 bytes of metadata:
+  //   Bytes 0–3: Signature "AVIZ"
+  //   Byte 4: Version (1)
+  //   Byte 5: barWidth (user‑chosen)
+  //   Byte 6: headerWidth
+  //   Byte 7: frameRate (ms per frame)
+  //   Bytes 8–9: sampleRate (16-bit big endian)
+  //   Bytes 10–11: frameSize (FFT size)
+  //   Bytes 12–13: numFrames (16-bit big endian)
+  //   Bytes 14–15: canvas.width (16-bit big endian)
+  //   Bytes 16–17: canvas.height (16-bit big endian)
+  // This header is repeated in every row (i.e. the entire leftmost headerWidth columns).
+  function drawHeader() {
+    const headerBytes = new Uint8Array(18);
+    headerBytes[0] = "A".charCodeAt(0);
+    headerBytes[1] = "V".charCodeAt(0);
+    headerBytes[2] = "I".charCodeAt(0);
+    headerBytes[3] = "Z".charCodeAt(0);
+    headerBytes[4] = 1; // version
+    headerBytes[5] = currentBarWidth; // barWidth (user‑chosen)
+    headerBytes[6] = headerWidth;
+    headerBytes[7] = frameRate;
+    headerBytes[8] = (sampleRate >> 8) & 0xFF;
+    headerBytes[9] = sampleRate & 0xFF;
+    headerBytes[10] = (analyser.fftSize >> 8) & 0xFF;
+    headerBytes[11] = analyser.fftSize & 0xFF;
+    headerBytes[12] = (capturedFrames.length >> 8) & 0xFF;
+    headerBytes[13] = capturedFrames.length & 0xFF;
+    headerBytes[14] = (canvas.width >> 8) & 0xFF;
+    headerBytes[15] = canvas.width & 0xFF;
+    headerBytes[16] = (canvas.height >> 8) & 0xFF;
+    headerBytes[17] = canvas.height & 0xFF;
+
+    const headerPixelsNeeded = Math.ceil(headerBytes.length / 3); // e.g. 6 pixels
+    for (let y = 0; y < canvas.height; y++) {
+      for (let x = 0; x < headerWidth; x++) {
+        if (x < headerPixelsNeeded) {
+          const index = x * 3;
+          const r = headerBytes[index];
+          const g = (index + 1 < headerBytes.length) ? headerBytes[index + 1] : 0;
+          const b = (index + 2 < headerBytes.length) ? headerBytes[index + 2] : 0;
+          ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+        } else {
+          ctx.fillStyle = "black";
+        }
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+  }
+
+  // ─── RENDER A SINGLE AUDIO FRAME ────────────────────────────
+  // Draw one vertical waveform column at the given x position.
+  function renderFrame(frameData, currentX) {
+    if (currentX >= canvas.width) return;
+    const barHeightFactor = canvas.height / frameData.length;
+    for (let i = 0; i < frameData.length; i++) {
+      const normalizedValue = frameData[i] / 255;
+      const prevValue = i > 0 ? frameData[i - 1] : frameData[i];
+      const derivative = Math.abs(normalizedValue - prevValue);
+      // Store the original sample value in the red channel.
+      const red = Math.floor(normalizedValue * 255);
+      const green = Math.floor((1 - normalizedValue) * derivative * 255);
+      const blue = Math.floor(Math.cos(normalizedValue * Math.PI) * 255);
+      ctx.fillStyle = `rgb(${red}, ${green}, ${blue})`;
+      const y = i * barHeightFactor;
+      ctx.fillRect(currentX, canvas.height - y - barHeightFactor, currentBarWidth, barHeightFactor);
+    }
+  }
+
+  // ─── CAPTURE & RENDER AUDIO ───────────────────────────────────
+  // The number of frames is determined from the recording duration and frameRate.
+  // The canvas width is set to: headerWidth + (framesToCapture * barWidth).
+  async function captureAndRender(framesToCapture) {
+    capturing = true;
+    capturedFrames.length = 0;
+    let currentX = headerWidth; // start drawing after header
+
+    for (let frame = 0; frame < framesToCapture; frame++) {
+      analyser.getByteTimeDomainData(dataArray);
+      capturedFrames.push([...dataArray]);
+      renderFrame(dataArray, currentX);
+      currentX += currentBarWidth;
+      await new Promise(resolve => setTimeout(resolve, frameRate));
+    }
+    // Draw the header over the header area.
+    drawHeader();
+    capturing = false;
+    playButton.disabled = false;
+  }
+
+  // ─── DECODE & PLAY AUDIO FROM CAPTURED FRAMES ────────────────
+  function decodeAndPlayAudio() {
+    if (capturedFrames.length === 0) {
+      console.error("No frames to decode.");
+      return;
+    }
+    // Ensure the AudioContext is running.
+    if (audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
+    const frameSize = analyser.fftSize;
+    const totalFrames = capturedFrames.length;
+    const totalSamples = totalFrames * frameSize;
+    const audioSamples = new Float32Array(totalSamples);
+    let sampleIndex = 0;
+    for (const frame of capturedFrames) {
+      for (let i = 0; i < frameSize; i++) {
+        const val = frame[i];
+        // Map [0,255] to [-1,1]
+        const sample = (val / 255) * 2 - 1;
+        audioSamples[sampleIndex++] = sample;
+      }
+    }
+    // Normalize samples.
+    const maxAmp = audioSamples.reduce((acc, s) => Math.max(acc, Math.abs(s)), 0);
+    if (maxAmp > 0) {
+      for (let i = 0; i < audioSamples.length; i++) {
+        audioSamples[i] /= maxAmp;
+      }
+    }
+    const buffer = audioContext.createBuffer(1, totalSamples, sampleRate);
+    buffer.copyToChannel(audioSamples, 0);
+    const source = audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioContext.destination);
+    source.start();
+
+    // ─── PLAYHEAD ANIMATION ─────────────────────────────────────
+    // Draw a red vertical line over the waveform to indicate playback progress.
+    const playStartTime = audioContext.currentTime;
+    const playbackDuration = buffer.duration;
+    // Ensure the playhead canvas matches the main canvas dimensions.
+    playheadCanvas.width = canvas.width;
+    playheadCanvas.height = canvas.height;
+    
+    function updatePlayhead() {
+      const currentTime = audioContext.currentTime;
+      const progress = (currentTime - playStartTime) / playbackDuration;
+      // Clear the playhead canvas.
+      playheadCtx.clearRect(0, 0, playheadCanvas.width, playheadCanvas.height);
+      if (progress >= 1) {
+        // At the end, draw the playhead at the far right.
+        const x = headerWidth + (canvas.width - headerWidth);
+        playheadCtx.beginPath();
+        playheadCtx.strokeStyle = "red";
+        playheadCtx.lineWidth = 2;
+        playheadCtx.moveTo(x, 0);
+        playheadCtx.lineTo(x, canvas.height);
+        playheadCtx.stroke();
+      } else {
+        const x = headerWidth + progress * (canvas.width - headerWidth);
+        playheadCtx.beginPath();
+        playheadCtx.strokeStyle = "red";
+        playheadCtx.lineWidth = 2;
+        playheadCtx.moveTo(x, 0);
+        playheadCtx.lineTo(x, canvas.height);
+        playheadCtx.stroke();
+        requestAnimationFrame(updatePlayhead);
+      }
+    }
+    updatePlayhead();
+  }
+
+  // ─── SAVE THE CANVAS AS AN IMAGE ─────────────────────────────
+  function saveCanvasAsImage() {
+    const imageDataURL = canvas.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.href = imageDataURL;
+    link.download = "visualizer.png";
+    link.click();
+  }
+
+  // ─── LOAD A SAVED IMAGE AND RECONSTRUCT AUDIO FRAMES ─────────
+  function loadImageOntoCanvas(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        // Set canvases to the image dimensions.
+        canvas.width = img.width;
+        canvas.height = img.height;
+        playheadCanvas.width = img.width;
+        playheadCanvas.height = img.height;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        // Read the header from row 0 (the header is repeated on every row).
+        const headerPixels = [];
+        for (let x = 0; x < headerWidth; x++) {
+          const pixelData = ctx.getImageData(x, 0, 1, 1).data;
+          headerPixels.push(pixelData[0], pixelData[1], pixelData[2]);
+        }
+        const headerBytes = headerPixels.slice(0, 18);
+        const signature = String.fromCharCode(headerBytes[0], headerBytes[1], headerBytes[2], headerBytes[3]);
+        if (signature !== "AVIZ") {
+          console.error("Invalid header signature.");
+          return;
+        }
+        // Extract header metadata.
+        const metaBarWidth = headerBytes[5];
+        const metaHeaderWidth = headerBytes[6];
+        const metaFrameRate = headerBytes[7];
+        const metaSampleRate = (headerBytes[8] << 8) | headerBytes[9];
+        const metaFrameSize = (headerBytes[10] << 8) | headerBytes[11];
+        const metaNumFrames = (headerBytes[12] << 8) | headerBytes[13];
+        const metaCanvasWidth = (headerBytes[14] << 8) | headerBytes[15];
+        const metaCanvasHeight = (headerBytes[16] << 8) | headerBytes[17];
+        console.log("Decoded header:", {
+          signature, metaBarWidth, metaHeaderWidth,
+          metaFrameRate, metaSampleRate, metaFrameSize, metaNumFrames,
+          metaCanvasWidth, metaCanvasHeight
+        });
+        capturedFrames.length = 0;
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const d = imageData.data;
+        // Reconstruct each frame from the waveform area.
+        for (let frame = 0; frame < metaNumFrames; frame++) {
+          const frameArray = new Uint8Array(metaFrameSize);
+          const xPos = metaHeaderWidth + frame * metaBarWidth;
+          for (let i = 0; i < metaFrameSize; i++) {
+            const yPos = Math.floor((i / metaFrameSize) * canvas.height);
+            const pixelIndex = (yPos * canvas.width + xPos) * 4;
+            frameArray[i] = d[pixelIndex]; // read the red channel
+          }
+          capturedFrames.push(frameArray);
+        }
+        console.log("Reconstructed frames:", capturedFrames.length);
+        playButton.disabled = false;
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ─── EVENT LISTENERS ──────────────────────────────────────────
+  captureButton.addEventListener("click", async () => {
+    if (!capturing) {
+      // Get the user-specified recording duration and bar width.
+      const durationSeconds = parseFloat(durationInput.value) || 30;
+      currentBarWidth = parseInt(barWidthInput.value) || 10;
+      const desiredCaptureDuration = durationSeconds * 1000;
+      const framesToCapture = Math.floor(desiredCaptureDuration / frameRate);
+      // Set canvas width to exactly fit the header plus the waveform area.
+      canvas.width = headerWidth + framesToCapture * currentBarWidth;
+      canvas.height = canvasHeight;
+      playheadCanvas.width = canvas.width;
+      playheadCanvas.height = canvas.height;
+      // Also update the container dimensions so that they match the canvases.
+      document.getElementById("canvasContainer").style.width = canvas.width + "px";
+      document.getElementById("canvasContainer").style.height = canvas.height + "px";
+      
+      captureButton.disabled = true;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      await captureAndRender(framesToCapture);
+      captureButton.disabled = false;
+    }
+  });
+
+  playButton.addEventListener("click", () => {
+    if (!capturing) {
+      decodeAndPlayAudio();
+    }
+  });
+
+  saveButton.addEventListener("click", saveCanvasAsImage);
+  imageLoader.addEventListener("change", loadImageOntoCanvas);
+}
+
+startVisualizer();
+</script>
+</body>
+</html>
