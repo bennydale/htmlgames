@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Squid Game Deluxe</title>
+
+  </head>
+  <canvas id="gameCanvas" width="640" height="480"></canvas>
+</html>
+<script>
+  const CALLRATE = 1000 / 24
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  var player = {x: 310, y: 420, alive: true}
+  var gameState = 'loadingScreen'
+  var playerSpeed = 3
+  var titleBackground = new Image()
+  titleBackground.src = "bottomLayer.png"
+    var titleForeground = new Image()
+  titleForeground.src = "topLayer.png"
+  var loadingBar = 0
+  var gameLoadedText = false
+  var skipButton = false
+  var gameLoaded = 0
+  var loadingAnimation = ["|", "/", "-", "\\", "|", "/", "-", "\\",]
+  var titleForegroundPosition = {x:0,y:0}
+  var titleBackgroundPosition = {x:0,y:0}
+  var i = 0
+  var l = 0
+  var e = 0
+  
+
+  var titleSong = new Audio('titleSong.mp3')
+
+
+  var activeKeys= {up: false, down: false, left: false, right: false}
+
+  function loadingScreen(){
+
+
+    
+    
+    ctx.fillStyle = "black"; 
+    ctx.fillRect (0, 0, 640, 480);
+    ctx.fillStyle = "white"; 
+    ctx.fillRect (10, 230, loadingBar, 20)
+
+    
+
+    if (i >= fileDirectories.length) {
+      i = 0
+    }; if (e >= loadingAnimation.length){
+      e = 0
+    }
+    ctx.font = '12px arial'
+    ctx.fillText(loadingAnimation[e] + " " + fileDirectories[i], 200, 270);
+    ctx.fillStyle = 'red'
+    ctx.fillRect(200, 330, 200, 70)
+    ctx.fillStyle = 'white'
+    ctx.font = '38px Impact'
+    ctx.fillText("skip loading", 205, 380)
+    ctx.font = '12px arial'
+
+    if (gameLoadedText){
+      ctx.fillText("game (" + gameLoaded + "/7) loaded", 200, 290)
+    }
+    l += 0.5
+    if (l >= 1){
+      i ++; 
+      l = 0
+      e ++;
+    }
+    if (loadingBar < 620){
+    loadingBar += .2
+    } else {
+      gameLoadedText = true
+      gameLoaded ++
+      loadingBar = 0;
+    }
+  } 
+
+  function titleCard(){
+    ctx.drawImage(titleBackground, titleBackgroundPosition.x, titleBackgroundPosition.y)
+    ctx.drawImage(titleForeground, titleForegroundPosition.x, titleForegroundPosition.y)
+    ctx.fillStyle = 'rgba(0,0,0,.4)'
+    ctx.fillRect(titleForegroundPosition.x + 445, titleForegroundPosition.y + 275, 140, 70)
+    ctx.fillStyle = 'rgb(150,0,0)'
+    ctx.fillRect(titleForegroundPosition.x + 440, titleForegroundPosition.y + 270, 140, 70)
+    ctx.fillStyle = 'darkBlue'
+    ctx.font = '50px Impact'
+    ctx.fillText("start", titleForegroundPosition.x + 460, titleForegroundPosition.y + 323)
+    titleSong.play();
+  }
+
+  document.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowUp'){
+          activeKeys.up = true
+        }
+        if (e.key === 'ArrowDown'){
+          activeKeys.down = true
+        }
+        if (e.key === 'ArrowLeft'){
+          activeKeys.left = true
+        }
+        if (e.key === 'ArrowRight'){
+          activeKeys.right = true
+        } 
+    });
+    document.addEventListener('keyup', function(e) {
+        if (e.key === 'ArrowUp'){
+          activeKeys.up = false
+        }
+        if (e.key === 'ArrowDown'){
+          activeKeys.down = false
+        }
+        if (e.key === 'ArrowLeft'){
+          activeKeys.left = false
+        }
+        if (e.key === 'ArrowRight'){
+          activeKeys.right = false
+        } 
+    });
+    canvas.addEventListener('click', (e)=> {
+      if(gameState == "loadingScreen"){
+      if (e.offsetX > 200 && e.offsetX < 400 && e.offsetY > 330 && e.offsetY < 400){
+        gameState = 'titleCard'
+      }
+    } else if(gameState == "titleCard"){
+      if (e.offsetX > titleForegroundPosition.x + 440 && e.offsetX < titleForegroundPosition.x + 580 && e.offsetY > titleForegroundPosition.y + 270 && e.offsetY < titleForegroundPosition.y + 340){
+        gameState = ""
+      }
+    }
+
+    })
+
+    document.addEventListener('mousemove', function(e) {
+     
+
+      var centerWidth = canvas.width / 2
+      titleForegroundPosition.x = (centerWidth - e.offsetX) / 10
+      var centerHeight = canvas.height / 2
+      titleForegroundPosition.y = (centerHeight - e.offsetY) / 10
+      titleBackgroundPosition.x = (centerWidth - e.offsetX) / 20
+      titleBackgroundPosition.Y = (centerHeight - e.offsetY) / 20
+      
+      if (titleForegroundPosition.x < -70){
+        titleForegroundPosition.x = -69
+      } if (titleForegroundPosition.x > 680){
+        titleForegroundPosition.x = 679
+      }
+       if (titleForegroundPosition.y < -2){
+        titleForegroundPosition.y = -1;
+      }
+      
+    });
+    function redLightGreenLight(){
+      titleSong.pause()
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'white'
+      ctx.font = "18px Impact"
+      ctx.fillText("the first game you will be playing is red light green light.", 50, 30)
+      ctx.fillText("even if you didn't watch the show; you still know how to play, fuck you.", 50, 50)
+      drawPlayer();
+    }
+  function drawPlayer() {
+    if (activeKeys.up){
+      player.y = player.y - playerSpeed
+    }
+    if (activeKeys.down){
+      player.y = player.y + playerSpeed
+    }
+    if (activeKeys.left){
+      player.x = player.x - playerSpeed
+    }
+    if (activeKeys.right){
+      player.x = player.x + playerSpeed
+    }
+    ctx.fillStyle = 'yellow';
+    ctx.fillRect(player.x, player.y, 20, 60)
+  }
+  var fileDirectories
+async function setUp() {
+  const response = await fetch("loadingScreenText.json");
+  const data = await response.json()
+  fileDirectories = data.data
+  setInterval( () => {
+    if (gameState == 'loadingScreen'){
+      loadingScreen();
+    } else if(gameState == "titleCard"){titleCard()} else {
+      redLightGreenLight()
+    }
+
+
+  }, CALLRATE)
+}
+setUp()
+
+
+
+</script>
