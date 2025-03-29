@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Anaglyph Cube Shooter – Level Transition</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: rgb(30,30,30); }
+    #gameInfo {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      z-index: 10;
+      background: rgba(0,0,0,0.5);
+      padding: 10px;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div id="gameInfo">
+    <div id="score">Score: 0</div>
+    <div id="lives">Lives: 3</div>
+    <div id="status"></div>
+  </div>
+  <canvas id="cubeCanvas"></canvas>
+  <script>
+    // ================= Canvas and Global Setup =================
+    const canvas = document.getElementById('cubeCanvas');
+    const ctx = canvas.getContext('2d');
+    let width = canvas.width = window.innerWidth;
+    let height = canvas.height = window.innerHeight;
+    let centerX = width / 2;
+    let centerY = height / 2;
+    
+    // ================= Game Variables =================
+    let score = 0;
+    let lives = 3;
+    let gameOver = false;
+    const scoreDisplay = document.getElementById('score');
+    const livesDisplay = document.getElementById('lives');
+    const statusDisplay = document.getElementById('status');
+    
+    // Game Phase: 1 = Phase 1, 2 = Level 2
+    let gamePhase = 1;
+    const phase1Duration = 40000; // Phase 1 lasts 40 seconds
+    let phase1StartTime = performance.now();
+    
+    // ---------------- Phase 1: Cubes, Stars & Icosphere ----------------
+    let cubes = [];
+    let lastSpawnTime = 0;
+    const spawnInterval = 1000; // spawn a cube every second
+    
+    // Global 3D Engine Settings
+    const cubeSize = 12000;
+    const perspectiveFactor = 20;
+    
+    const vertices = [
+      { x: -1, y: -1, z: -1 },
+      { x:  1, y: -1, z: -1 },
+      { x:  1, y:  1, z: -1 },
+      { x: -1, y:  1, z: -1 },
+      { x: -1, y: -1, z:  1 },
+      { x:  1, y: -1, z:  1 },
+      { x:  1, y:  1, z:  1 },
+      { x: -1, y:  1, z:  1 }
+    ];
+    const edges = [
+      [0,1], [1,2], [2,3], [3,0],
+      [4,5], [5,6], [6,7], [7,4],
+      [0,4], [1,5], [2,6], [3,7]
+    ];
+    
+    let angleX = 0;
+    let angleY = 0;
+    
+    // ---------------- 3D Math Functions ----------------
+    function rotateX(point, angle) {
+      const cos = Math.cos(angle), sin = Math.sin(angle);
+      return { x: point.x, y: point.y * cos - point.z * sin, z: point.y * sin + point.z * cos };
+    }
+    function rotateY(point, angle) {
+      const cos = Math.cos(angle), sin = Math.sin(angle);
+      return { x: point.x * cos + point.z * sin, y: point.y, z: -point.x * sin + point.z * cos };
+    }
+    function project(point, cameraZ, baseX, baseY, offsetX = 0, scaleFactor = cubeSize) {
+      const scale = scaleFactor / (cameraZ + point.z * perspectiveFactor);
+      return {
+        x: point.x * scale + baseX + offsetX,
+        y: point.y * scale + baseY
+      };
+    }
+    
+    // ---------------- Star Field ----------------
+    const numStars = 4000;
+    const starFieldDepth = 1000;
+    const starSpeed = 1;
+    const starMid = starFieldDepth / 2; 
+    const starAnaglyphFactor = 0.02;
+    let stars = [];
+    function initStars() {
+      stars = [];
+      for (let i = 0; i < numStars; i++) {
+        stars.push({
+          x: Math.random() * width - centerX,
+          y: Math.random() * height - centerY,
+          z: Math.random() * starFieldDepth
+        });
+      }
+    }
+    initStars();
+    function updateAndDrawStars(deltaTime) {
+      const focalLength = width;
+      for (let star of stars) {
+        star.z -= starSpeed * deltaTime;
+        if (star.z <= 1) {
+          star.z = starFieldDepth;
+          star.x = Math.random() * width - centerX;
+          star.y = Math.random() * height - centerY;
+        }
+        const disparity = (star.z - starMid) * starAnaglyphFactor;
+        const redOffset = -disparity;
+        const blueOffset = disparity;
+        const starScreenXRed = centerX + (star.x / star.z) * focalLength + redOffset;
+        const starScreenYRed = centerY + (star.y / star.z) * focalLength;
+        const starScreenXBlue = centerX + (star.x / star.z) * focalLength + blueOffset;
+        const starScreenYBlue = centerY + (star.y / star.z) * focalLength;
+        const starSize = Math.max(0.5, (1 - star.z / starFieldDepth) * 3);
+        
+        ctx.globalCompositeOperation = 'screen';
+        ctx.beginPath();
+        ctx.arc(starScreenXRed, starScreenYRed, starSize, 0, Math.PI * 2);
+        ctx.fillStyle = 'red';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(starScreenXBlue, starScreenYBlue, starSize, 0, Math.PI * 2);
+        ctx.fillStyle = 'blue';
+        ctx.fill();
+      }
+    }
+    
+    // ---------------- Icosphere with Dynamic Anaglyph ----------------
+    const t = (1 + Math.sqrt(5)) / 2;
+    const icoVertices = [
+      [-1, t, 0],
+      [1, t, 0],
+      [-1, -t, 0],
+      [1, -t, 0],
+      [0, -1, t],
+      [0, 1, t],
+      [0, -1, -t],
+      [0, 1, -t],
+      [t, 0, -1],
+      [t, 0, 1],
+      [-t, 0, -1],
+      [-t, 0, 1]
+    ];
+    const icoEdges = [
+      [0,1], [0,5], [0,7], [0,10], [0,11],
+      [1,5], [1,7], [1,8], [1,9],
+      [2,3], [2,4], [2,6], [2,10], [2,11],
+      [3,4], [3,6], [3,8], [3,9],
+      [4,5], [4,9], [4,11],
+      [5,9], [5,11],
+      [6,7], [6,8], [6,10],
+      [7,8], [7,10],
+      [8,9],
+      [10,11]
+    ];
+    const icoDistance = 1500;
+    const icoInitialScale = 0.1;
+    const icoFinalScale = Math.max(width, height);
+    const icoGrowthDuration = 120000; // 120 seconds
+    let icoStartTime = performance.now();
+    function drawIcosphere() {
+      let currentTime = performance.now();
+      let elapsed = currentTime - icoStartTime;
+      let progress = Math.min(elapsed / icoGrowthDuration, 1);
+      let currentScale = icoInitialScale + (icoFinalScale - icoInitialScale) * progress;
+      // Transition to Level 2 when Phase 1 time is up.
+      if (currentTime - phase1StartTime >= phase1Duration && gamePhase === 1) {
+        gamePhase = 2;
+        cubes = [];
+        stars = [];
+        if (!window.level2Loaded) {
+          var script = document.createElement('script');
+          script.src = 'level2.js';
+          script.onload = function() {
+            window.level2Loaded = true;
+            if (window.level2 && typeof window.level2.init === 'function') {
+              window.level2.init();
+            }
+          };
+          document.body.appendChild(script);
+        }
+        return;
+      }
+      
+      // Dynamic anaglyph effect for the icosphere.
+      const maxIcoDisparity = 40;
+      let dynamicIcoDisparity = maxIcoDisparity * Math.cos(Math.PI * progress);
+      let redOffset = -dynamicIcoDisparity;
+      let blueOffset = dynamicIcoDisparity;
+      
+      let rotX = angleX * 0.5;
+      let rotY = angleY * 0.5;
+      let transformed = icoVertices.map(v => {
+        let p = { x: v[0] * currentScale, y: v[1] * currentScale, z: v[2] * currentScale };
+        p = rotateX(p, rotX);
+        p = rotateY(p, rotY);
+        p.z += icoDistance;
+        return p;
+      });
+      ctx.lineWidth = 2;
+      ctx.globalCompositeOperation = 'screen';
+      ctx.strokeStyle = "red";
+      drawIcoEdges(transformed, icoDistance, centerX, centerY, redOffset);
+      ctx.strokeStyle = "blue";
+      drawIcoEdges(transformed, icoDistance, centerX, centerY, blueOffset);
+    }
+    function drawIcoEdges(transformed, cameraZ, baseX, baseY, offsetX) {
+      ctx.beginPath();
+      for (let edge of icoEdges) {
+        let p1 = project(transformed[edge[0]], cameraZ, baseX, baseY, offsetX);
+        let p2 = project(transformed[edge[1]], cameraZ, baseX, baseY, offsetX);
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+      }
+      ctx.stroke();
+    }
+    
+    // ---------------- Phase 1: Cube and Explosion Logic ----------------
+    function drawCube(cube) {
+      const mid = 350, factor = 0.05;
+      const disparity = (cube.distance - mid) * factor;
+      const redOffset = -disparity, blueOffset = disparity;
+      const baseX = centerX + cube.x;
+      const baseY = centerY + cube.y;
+      let rotated = vertices.map(v => {
+        let r = rotateX(v, angleX);
+        r = rotateY(r, angleY);
+        return r;
+      });
+      ctx.lineWidth = 2;
+      ctx.globalCompositeOperation = 'screen';
+      ctx.strokeStyle = "red";
+      drawEdges(rotated, cube.distance, baseX, baseY, redOffset, cubeSize);
+      ctx.strokeStyle = "blue";
+      drawEdges(rotated, cube.distance, baseX, baseY, blueOffset, cubeSize);
+    }
+    function drawEdges(rotated, cameraZ, baseX, baseY, offsetX, scaleFactor) {
+      ctx.beginPath();
+      for (let edge of edges) {
+        const p1 = project(rotated[edge[0]], cameraZ, baseX, baseY, offsetX, scaleFactor);
+        const p2 = project(rotated[edge[1]], cameraZ, baseX, baseY, offsetX, scaleFactor);
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+      }
+      ctx.stroke();
+    }
+    function createExplosion(cube) {
+      let pieces = [];
+      const pieceCount = 5 + Math.floor(Math.random() * 5);
+      for (let i = 0; i < pieceCount; i++) {
+        const vertexCount = 3 + Math.floor(Math.random() * 4);
+        let poly = [];
+        const radius = 10 + Math.random() * 10;
+        for (let j = 0; j < vertexCount; j++) {
+          const ang = (j / vertexCount) * Math.PI * 2;
+          poly.push({
+            x: radius * Math.cos(ang) * (0.8 + Math.random() * 0.4),
+            y: radius * Math.sin(ang) * (0.8 + Math.random() * 0.4),
+            z: -5 + Math.random() * 10
+          });
+        }
+        pieces.push({
+          x: cube.x,
+          y: cube.y,
+          z: cube.distance,
+          vx: -1 + Math.random() * 2,
+          vy: -1 + Math.random() * 2,
+          vz: -1 - Math.random() * 2,
+          angle: 0,
+          rotationSpeed: -0.1 + Math.random() * 0.2,
+          polygon: poly
+        });
+      }
+      return pieces;
+    }
+    function updateAndDrawExplosion(cube, deltaTime) {
+      const mid = 350, factor = 0.05;
+      let alpha = cube.explosionTimer / 500;
+      for (let piece of cube.explosionPieces) {
+        piece.x += piece.vx * deltaTime * 0.01;
+        piece.y += piece.vy * deltaTime * 0.01;
+        piece.z += piece.vz * deltaTime * 0.01;
+        piece.angle += piece.rotationSpeed * deltaTime * 0.01;
+        const baseX = centerX + piece.x;
+        const baseY = centerY + piece.y;
+        const disparity = (piece.z - mid) * factor;
+        const redOffset = -disparity, blueOffset = disparity;
+        ctx.save();
+        ctx.translate(baseX, baseY);
+        ctx.rotate(piece.angle);
+        ctx.translate(-baseX, -baseY);
+        ctx.globalCompositeOperation = 'screen';
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = `rgba(255,255,0,${alpha})`;
+        ctx.beginPath();
+        let first = project(piece.polygon[0], piece.z, baseX, baseY, redOffset, cubeSize/20);
+        ctx.moveTo(first.x, first.y);
+        for (let k = 1; k < piece.polygon.length; k++) {
+          let p = project(piece.polygon[k], piece.z, baseX, baseY, redOffset, cubeSize/20);
+          ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.strokeStyle = `rgba(255,255,0,${alpha})`;
+        ctx.beginPath();
+        first = project(piece.polygon[0], piece.z, baseX, baseY, blueOffset, cubeSize/20);
+        ctx.moveTo(first.x, first.y);
+        for (let k = 1; k < piece.polygon.length; k++) {
+          let p = project(piece.polygon[k], piece.z, baseX, baseY, blueOffset, cubeSize/20);
+          ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+    
+    function spawnCube() {
+      let cube = {
+        distance: 800,
+        x: (Math.random() < 0.5 ? -1 : 1) * (200 + Math.random() * 100),
+        y: -200 + Math.random() * 400,
+        speed: 1 + Math.random() * 2,
+        exploded: false,
+        explosionTimer: 0,
+        explosionPieces: null
+      };
+      cubes.push(cube);
+    }
+    
+    function addFlicker() {
+      const flickerAlpha = Math.random() * 0.1;
+      ctx.fillStyle = `rgba(0,0,0,${flickerAlpha})`;
+      ctx.fillRect(0, 0, width, height);
+    }
+    
+    // ---------------- Main Animation Loop ----------------
+    let lastTime = performance.now();
+    function animate(timestamp) {
+      const deltaTime = timestamp - lastTime;
+      lastTime = timestamp;
+      ctx.clearRect(0, 0, width, height);
+      
+      if (gamePhase === 1) {
+        updateAndDrawStars(deltaTime);
+        drawIcosphere();
+        angleX += 0.01;
+        angleY += 0.01;
+        if (timestamp - lastSpawnTime > spawnInterval) {
+          spawnCube();
+          lastSpawnTime = timestamp;
+        }
+        for (let i = cubes.length - 1; i >= 0; i--) {
+          let cube = cubes[i];
+          if (cube.exploded) {
+            cube.explosionTimer -= deltaTime;
+            if (!cube.explosionPieces) {
+              cube.explosionPieces = createExplosion(cube);
+            }
+            updateAndDrawExplosion(cube, deltaTime);
+            if (cube.explosionTimer <= 0) {
+              cubes.splice(i, 1);
+            }
+            continue;
+          }
+          cube.distance -= cube.speed;
+          drawCube(cube);
+          if (cube.distance < 150) {
+            cubes.splice(i, 1);
+            lives--;
+            livesDisplay.textContent = `Lives: ${lives}`;
+            if (lives <= 0) {
+              gameOver = true;
+              statusDisplay.textContent = "GAME OVER";
+            }
+          }
+        }
+        scoreDisplay.textContent = `Score: ${score}`;
+        addFlicker();
+      } else if (gamePhase === 2 && window.level2 && typeof window.level2.updateAndDraw === 'function') {
+        window.level2.updateAndDraw(deltaTime, timestamp);
+      }
+      
+      if (!gameOver) requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+    
+    // ---------------- Event Handlers ----------------
+    window.addEventListener('resize', function() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+      centerX = width / 2;
+      centerY = height / 2;
+      initStars();
+    });
+    
+    canvas.addEventListener('click', function(e) {
+      if (gameOver) return;
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      if (gamePhase === 1) {
+        for (let i = cubes.length - 1; i >= 0; i--) {
+          let cube = cubes[i];
+          if (cube.exploded) continue;
+          const projCenter = project({ x: 0, y: 0, z: 0 }, cube.distance, centerX + cube.x, centerY + cube.y);
+          const scale = cubeSize / cube.distance;
+          const radius = scale;
+          const dx = mouseX - projCenter.x;
+          const dy = mouseY - projCenter.y;
+          if (Math.sqrt(dx * dx + dy * dy) < radius) {
+            cube.exploded = true;
+            cube.explosionTimer = 500;
+            score++;
+            break;
+          }
+        }
+      } else if (gamePhase === 2 && window.level2 && typeof window.level2.handleClick === 'function') {
+        window.level2.handleClick(mouseX, mouseY);
+      }
+    });
+    
+    // --------- NEW: Keydown Handler for Instant Level 2 ---------
+    window.addEventListener('keydown', function(e) {
+      // Check for F2 key press.
+      if (e.key === 'F2') {
+        if (gamePhase === 1) {
+          gamePhase = 2;
+          cubes = [];
+          stars = [];
+          if (!window.level2Loaded) {
+            var script = document.createElement('script');
+            script.src = 'level2.js';
+            script.onload = function() {
+              window.level2Loaded = true;
+              if (window.level2 && typeof window.level2.init === 'function') {
+                window.level2.init();
+              }
+            };
+            document.body.appendChild(script);
+          }
+        }
+      }
+    });
+  </script>
+</body>
+</html>

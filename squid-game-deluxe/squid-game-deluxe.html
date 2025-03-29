@@ -4,15 +4,17 @@
     <title>Squid Game Deluxe</title>
 
   </head>
+  <body>
   <canvas id="gameCanvas" width="640" height="480"></canvas>
+</body>
 </html>
 <script>
   const CALLRATE = 1000 / 24
   const canvas = document.getElementById('gameCanvas');
   const ctx = canvas.getContext('2d');
-  var player = {x: 310, y: 420, alive: true}
+  var player = {x: 310, y: 250, alive: true, momentumX:0, momentumY:0}
   var gameState = 'loadingScreen'
-  var playerSpeed = 3
+  var playerSpeed = .05
   var titleBackground = new Image()
   titleBackground.src = "bottomLayer.png"
     var titleForeground = new Image()
@@ -27,13 +29,27 @@
   var i = 0
   var l = 0
   var e = 0
-  
-
+  var cutscene1 = true
+  var previewBackground = new Image()
+  previewBackground.src = "previewBackground.png"
+  previewBackground
+  var previewDollNotLooking = new Image()
+  previewDollNotLooking.src = "previewDollNotLooking.png"
+  var previewDollTurning = new Image()
+  previewDollTurning.src = "previewDollTurning.png"
+  var previewDollLooking = new Image()
+  previewDollLooking.src = "previewDollLooking.png"
+  var running
   var titleSong = new Audio('titleSong.mp3')
-
-
-  var activeKeys= {up: false, down: false, left: false, right: false}
-
+  var sandTexture = new Image()
+  sandTexture.src = ("sandTexture.png")
+  var dollState = "greenLight" // turning, red ligt
+  var activeKeys= {up: false, down: false, left: false, right: false, shift: false}
+  var maxPlayerSpeed = 4
+  var maxPlayerRunningSpeed = 8
+  var greenLightDuration = [
+    6, 5, 5, 4, 4, 4, 4, 4, 3, 2,  
+  ]
   function loadingScreen(){
 
 
@@ -105,6 +121,16 @@
           activeKeys.right = true
         } 
     });
+    document.addEventListener('keydown', function(e){
+        if (e.key === 'Shift'){
+          activeKeys.shift = true
+        }
+    })
+    document.addEventListener('keyup', function(e){
+        if (e.key === 'Shift'){
+          activeKeys.shift = false
+        }
+    })
     document.addEventListener('keyup', function(e) {
         if (e.key === 'ArrowUp'){
           activeKeys.up = false
@@ -126,9 +152,20 @@
       }
     } else if(gameState == "titleCard"){
       if (e.offsetX > titleForegroundPosition.x + 440 && e.offsetX < titleForegroundPosition.x + 580 && e.offsetY > titleForegroundPosition.y + 270 && e.offsetY < titleForegroundPosition.y + 340){
-        gameState = ""
+        gameState = "redLightGreenLight"
+      }
+    } else if (gameState == "redLightGreenLight"){
+      if (e.offsetX > 450 && e.offsetX < 570 && e.offsetY > 423 && e.offsetY < 473) {
+          startCoundown()
+          cutsceneSetUpComplete = true
+          clearInterval(updateCutsceneInterval)
+          cutscene1 = false
+          var vid = document.getElementsByTagName("video")[0]
+          vid.pause()
+          
       }
     }
+    
 
     })
 
@@ -152,32 +189,269 @@
       }
       
     });
+    function updateVideo(vid){
+      ctx.fillStyle = "black"; ctx.fillRect(0, 0, 640, 480)
+      ctx.drawImage(vid, 0, 62, canvas.width, 350);
+      const frame = ctx.getImageData(0, 62, canvas.width, 350);
+      const data = frame.data
+      const p = 25
+      for (let i = 0; i < data.length; i += 4) {
+        const red = data[i + 0];
+        var o = Math.floor(red/p)
+        data[i + 0] = o * p
+        const green = data[i + 1];
+        var o = Math.floor(green/p)
+        data[i + 1] = o * p
+        const blue = data[i + 2];
+        var o = Math.floor(blue/p)
+        data[i + 2] = o * p        
+      }
+      ctx.putImageData(frame, 0, 62)
+      ctx.fillStyle = 'white';
+      ctx.fillRect(450, 423, 120, 50)
+
+
+      ctx.fillStyle = 'black'
+    ctx.font = '50px Impact'
+    ctx.fillText("skip",  463,  466)
+    }
+
+
+    var cutsceneSetUpComplete = false
+    var updateCutsceneInterval = null
+    function setUpAndPlay(){
+      let vid = document.createElement("video")
+      vid.src = "cutscene1.mp4"
+
+      document.getElementsByTagName("body")[0].append(vid)
+      vid.play()   
+      vid.style.display = "none"
+       
+      updateCutsceneInterval = setInterval(()=>{updateVideo(vid)}, 30)
+      vid.addEventListener("ended", ()=>{
+        clearInterval(updateCutsceneInterval)
+        cutscene1 = false
+      })
+
+    }
+
+
+    var sandTextureY = -3601.7
+    var sandTextureX = -250
+    var previewX =  100
+    var countDownSecondsLeft = 61
+    function startCoundown(){
+      setInterval( ()=> {
+        countDownSecondsLeft --
+        if (countDownSecondsLeft == -1){
+          countDownSecondsLeft = 0
+        }
+      }, 1000)
+    }
+  
+    f = new FontFace('calc', 'url(digital-7.ttf)');
+    f.load().then(function(font) {
+      document.fonts.add(font)
+    })
+    
+    function getRandomInt(min, max) {
+      const minCeiled = Math.ceil(min);
+      const maxFloored = Math.floor(max);
+      return Math.floor(Math.random() * (maxFloored - minCeiled) + minCeiled); // The maximum is exclusive and the minimum is inclusive
+    }
+    gInx = 0
+
+//   ctx.drawImage(previewBackground, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 ) 
+//ctx.drawImage(previewDollLooking, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 )
+
+//ctx.drawImage(previewBackground, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 ) 
+//ctx.drawImage(previewDollNotLooking, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 )    
+//ctx.drawImage(previewBackground, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 ) 
+  //    ctx.drawImage(previewDollLooking, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 ) 
+     
+
+    let state = "greenLight"   
+    let startDelay = false
+    function preview(){
+      var percentX = player.x / canvas.width
+      //console.log(state)
+      if (state == 'greenLight'){
+        ctx.drawImage(previewBackground, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 ) 
+        ctx.drawImage(previewDollNotLooking, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 )
+      }
+      if(state =="yellowLight"){
+        ctx.drawImage(previewBackground, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 ) 
+        ctx.drawImage(previewDollTurning, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 ) 
+      }
+      if(state == "redLight"){
+        ctx.drawImage(previewBackground, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 ) 
+        ctx.drawImage(previewDollLooking, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 ) 
+      }
+      if(!startDelay && state == "greenLight"){
+        startDelay = true
+        setTimeout( () =>{
+          state = "yellowLight"
+          setTimeout(()=>{
+            startDelay=false
+            state = "redLight"
+          },1000)
+        }, getRandomInt(2000, 8000)) 
+      }
+      if(!startDelay && state=="redLight"){
+        startDelay=true
+        setTimeout(()=>{
+          state = "yellowLight"
+          setTimeout(()=>{
+            state="greenLight"
+            startDelay = false
+          }, 1000)
+          
+        }, getRandomInt(2000, 4000))
+      }
+
+      ctx.fillStyle = 'red'
+      ctx.font = "50px calc"            
+      ctx.fillText(countDownSecondsLeft, 570, 40)
+      //draw player speed
+      ctx.font = "20px calc" 
+      ctx.fillText("player speed: " + player.momentumY, 500, 80)
+    }
+
     function redLightGreenLight(){
       titleSong.pause()
-      ctx.fillStyle = 'black';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = 'white'
-      ctx.font = "18px Impact"
-      ctx.fillText("the first game you will be playing is red light green light.", 50, 30)
-      ctx.fillText("even if you didn't watch the show; you still know how to play, fuck you.", 50, 50)
-      drawPlayer();
+      if (cutscene1){
+        if (!cutsceneSetUpComplete){
+          
+          setUpAndPlay();
+          cutsceneSetUpComplete = true
+        }
+        
+        return
+      }
+      
+      ctx.drawImage(sandTexture, sandTextureX, sandTextureY)
+
+      if(player.alive){
+        drawPlayer();
+      }else{
+        drawDeadPlayer()
+      }
+      
+      preview()
+    }
+    function drawDeadPlayer(){
+      ctx.fillStyle = 'red';
+      ctx.fillRect(player.x, player.y, 50, 17)
+
     }
   function drawPlayer() {
-    if (activeKeys.up){
-      player.y = player.y - playerSpeed
+
+    //round decimals to stop player from floating away.
+    
+    console.log(player.momentumX)
+    player.y += player.momentumY
+    player.x += player.momentumX
+    console.log(state )
+   if (state == "redLight" && player.momentumY != 0){
+    player.alive = false;
+   }
+   if (state == "redLight" && player.momentumX != 0){
+    player.alive = false;
+   }
+    if (player.y < 200 && sandTextureY < 0){
+      player.y -= player.momentumY
+      sandTextureY -= player.momentumY
     }
+    if(player.y > 200 && sandTextureY != -3600 && sandTextureY > -3600 && sandTextureY < 0){
+      player.y -= player.momentumY
+      sandTextureY -= player.momentumY
+    }
+    if(sandTextureY <= -3600 && player.y > 200){
+      player.y = 200
+    }
+    if(sandTextureY > 0 ){
+      sandTextureY = 0;
+    }
+    if(sandTextureY == 0 && player.y <= 200){
+      player.y = 200
+    }
+
+
+    if(player.x < 250 && sandTextureX > -1200){
+      player.x -= player.momentumX
+      sandTextureX -= player.momentumX
+    }
+    if(player.x > 350 && sandTextureX > -1200){
+      player.x -= player.momentumX
+      sandTextureX -= player.momentumX
+    }
+    if (activeKeys.shift) {
+      playerSpeed = .1
+    } else {
+      playerSpeed = .05
+    }
+    //key binds
+    if (activeKeys.up){
+      player.momentumY = player.momentumY - playerSpeed
+
+      if (player.momentumY < maxPlayerRunningSpeed*-1){
+        player.momentumY = maxPlayerRunningSpeed*-1
+      }
+    }    
     if (activeKeys.down){
-      player.y = player.y + playerSpeed
+      player.momentumY = player.momentumY + playerSpeed
+      if (player.momentumY > maxPlayerRunningSpeed){
+        player.momentumY = maxPlayerRunningSpeed   
+      }
     }
     if (activeKeys.left){
-      player.x = player.x - playerSpeed
+      player.momentumX = player.momentumX - playerSpeed
+      if (player.momentumX < maxPlayerRunningSpeed*-1){
+        player.momentumX = maxPlayerRunningSpeed*-1
+      }
     }
     if (activeKeys.right){
-      player.x = player.x + playerSpeed
+      player.momentumX = player.momentumX + playerSpeed
+      if (player.momentumX > maxPlayerRunningSpeed){
+        player.momentumX = maxPlayerRunningSpeed
+      }
     }
+
+    //velocity damper
+    if (player.momentumX > 0 && !activeKeys.right ){
+      player.momentumX = player.momentumX - playerSpeed*2
+      if (player.momentumX < 0 ){
+        player.momentumX = 0
+      }
+    }
+    if (player.momentumX < 0 && !activeKeys.left){
+      player.momentumX = player.momentumX + playerSpeed*2
+      if (player.momentumX> 0 ){
+        player.momentumX = 0
+      }
+    } 
+
+    if (player.momentumY > 0 && !activeKeys.down){
+      player.momentumY = player.momentumY - playerSpeed*4
+      if (player.momentumY< 0 ){
+        player.momentumY = 0
+      }
+    }
+    if (player.momentumY < 0 && !activeKeys.up){
+      player.momentumY = player.momentumY + playerSpeed*4
+      if (player.momentumY > 0 ){
+        player.momentumY = 0
+      }
+    }
+
     ctx.fillStyle = 'yellow';
-    ctx.fillRect(player.x, player.y, 20, 60)
+    ctx.fillRect(player.x, player.y, 17, 50)
+
+   
+   
+    
   }
+  
   var fileDirectories
 async function setUp() {
   const response = await fetch("loadingScreenText.json");
@@ -188,6 +462,7 @@ async function setUp() {
       loadingScreen();
     } else if(gameState == "titleCard"){titleCard()} else {
       redLightGreenLight()
+
     }
 
 
