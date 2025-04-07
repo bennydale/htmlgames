@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Anaglyph Polytopes vFinal++</title>
+	<style>
+		body{font-family:sans-serif;display:flex;flex-direction:column;align-items:center;margin:0;background-color:#f0f0f0;overscroll-behavior:none;}
+		canvas{border:1px solid black;background-color:#000;margin-top:10px;cursor:grab;touch-action:none;}
+		canvas:active{cursor:grabbing;}
+		.controls-container{display:flex;flex-wrap:wrap;justify-content:center;gap:20px;margin-top:15px;padding:10px;background-color:#fff;border:1px solid #ccc;border-radius:5px;max-width:700px;}
+		.control-group{display:flex;flex-direction:column;align-items:center;}
+		.control-group>div{display:grid;grid-template-columns:auto 1fr auto;gap:5px 10px;align-items:center;margin-top:5px;}
+		.control-group>label{font-weight:bold;margin-bottom:5px;text-decoration:underline;}
+		label{text-align:right;font-weight:bold;}
+		input[type="range"]{width:130px;}
+		span{min-width:40px;text-align:right;font-family:monospace;}
+		h1{margin-bottom:5px;}
+		p{margin:5px 0 10px 0;font-size:0.9em;color:#555;max-width:700px;text-align:center;}
+		button,select{padding:8px 10px;margin-top:5px;cursor:pointer;}
+		select{margin-bottom:5px;}
+		html:-webkit-full-screen{background:#333;} html:-moz-full-screen{background:#333;} html:fullscreen{background:#333;}
+		canvas:-webkit-full-screen{width:100vw;height:100vh;border:none;} canvas:-moz-full-screen{width:100vw;height:100vh;border:none;} canvas:fullscreen{width:100vw;height:100vh;border:none;}
+	</style>
+</head>
+<body>
+	<h1>Anaglyph Wireframe Polytopes</h1>
+	<p>Use Red/Cyan 3D glasses. Select 4D shape. Adjust Anaglyph Depth. Choose rendering mode. <b>L-drag</b>=3D rot, <b>R-drag</b>=4D rot(WX/WZ), <b>Scroll</b>=zoom. Sliders for 4D rot(WY). Map: X:R, Y:B, Z:G, W:Y.</p>
+	<button id="fullscreenBtn">Enter Fullscreen</button>
+	<canvas id="polytopeCanvas" width="700" height="550"></canvas>
+	<div class="controls-container">
+		<div class="control-group">
+			<label>Shape & View</label>
+			<select id="shapeSelect"><option value="Tesseract">Tesseract (8-cell)</option><option value="Pentachoron">Pentachoron (5-cell)</option><option value="Orthoplex">Orthoplex (16-cell)</option></select>
+			<select id="renderModeSelect"><option value="wireframe">Wireframe</option><option value="translucent">Translucent</option><option value="opaque">Opaque</option></select>
+			<div><label for="anaglyphDepth">Depth:</label><input type="range" id="anaglyphDepth" min="0" max="0.5" step="0.01" value="0.18"><span id="valAnaglyphDepth">0.18</span></div>
+		</div>
+		<div class="control-group">
+			<label>4D Rotation Controls</label>
+			<div>
+				<label for="rotWX">WX:</label><input type="range" id="rotWX" min="0" max="6.283" step="0.01" value="0.1"><span id="valWX">0.10</span>
+				<label for="rotWY">WY:</label><input type="range" id="rotWY" min="0" max="6.283" step="0.01" value="0.1"><span id="valWY">0.10</span>
+				<label for="rotWZ">WZ:</label><input type="range" id="rotWZ" min="0" max="6.283" step="0.01" value="0.1"><span id="valWZ">0.10</span>
+			</div>
+		</div>
+	</div>
+	<script>
+		const canvas=document.getElementById('polytopeCanvas');const ctx=canvas.getContext('2d');let width=canvas.width;let height=canvas.height;
+		const scale=120;const distance4D=4;let distance3D=5.0;const minDistance3D=1.5;const maxDistance3D=50.0;let eyeSeparation=0.18;const edgeLineWidth=1.5;const faceAlpha=0.4;const rotationSpeed3D=0.007;const rotationSpeed4D=0.01;const zoomSpeed=0.01;
+		const mapSize=50;const mapPadding=15;const mapLineWidth=3;const mapAxisLength4D=1.5;
+
+		// --- Precompute Shape Data ---
+		const tesseractVertices=(()=>{const v=[];for(let i=0;i<16;i++)v.push({w:(i&8)?1:-1,x:(i&4)?1:-1,y:(i&2)?1:-1,z:(i&1)?1:-1});return v;})();
+		const tesseractEdges=(()=>{const e=[];const v=tesseractVertices;for(let i=0;i<16;i++)for(let j=i+1;j<16;j++){let d=0;if(v[i].w!==v[j].w)d++;if(v[i].x!==v[j].x)d++;if(v[i].y!==v[j].y)d++;if(v[i].z!==v[j].z)d++;if(d===1)e.push([i,j]);}return e;})();
+		const tesseractFaces=[[0,1,3,2],[4,5,7,6],[0,1,5,4],[2,3,7,6],[0,2,6,4],[1,3,7,5],[8,9,11,10],[12,13,15,14],[8,9,13,12],[10,11,15,14],[8,10,14,12],[9,11,15,13],[0,4,12,8],[1,5,13,9],[2,6,14,10],[3,7,15,11],[0,2,10,8],[1,3,11,9],[4,6,14,12],[5,7,15,13]];
+
+		const pentachoronVertices=(()=>{const a=1/Math.sqrt(10),sc=1.8,z1=-1/(2*Math.sqrt(2)),z2=Math.sqrt(2)-1/(2*Math.sqrt(2));return[{w:a,x:a,y:a,z:z1},{w:a,x:-a,y:-a,z:z1},{w:-a,x:a,y:-a,z:z1},{w:-a,x:-a,y:a,z:z1},{w:0,x:0,y:0,z:z2}].map(p=>({w:p.w*sc,x:p.x*sc,y:p.y*sc,z:p.z*sc}));})();
+		const pentachoronEdges=[[0,1],[0,2],[0,3],[0,4],[1,2],[1,3],[1,4],[2,3],[2,4],[3,4]];
+		const pentachoronFaces=[[0,1,2],[0,1,3],[0,1,4],[0,2,3],[0,2,4],[0,3,4],[1,2,3],[1,2,4],[1,3,4],[2,3,4]];
+
+		const orthoplexVertices=[{w:1,x:0,y:0,z:0},{w:-1,x:0,y:0,z:0},{w:0,x:1,y:0,z:0},{w:0,x:-1,y:0,z:0},{w:0,x:0,y:1,z:0},{w:0,x:0,y:-1,z:0},{w:0,x:0,y:0,z:1},{w:0,x:0,y:0,z:-1}].map(p=>({w:p.w*1.5,x:p.x*1.5,y:p.y*1.5,z:p.z*1.5}));
+		const orthoplexEdges=(()=>{const e=[];const v=orthoplexVertices;for(let i=0;i<8;++i)for(let j=i+1;j<8;++j){if(!(v[i].w===-v[j].w&&v[i].x===-v[j].x&&v[i].y===-v[j].y&&v[i].z===-v[j].z))e.push([i,j]);}return e;})();
+		const orthoplexFaces=(()=>{const f=[];const v=orthoplexVertices;const ids=[0,1,2,3,4,5,6,7];ids.forEach(i=>{ids.forEach(j=>{if(j<=i)return;const vi=v[i],vj=v[j];if(vi.w===-vj.w&&vi.x===-vj.x&&vi.y===-vj.y&&vi.z===-vj.z)return;ids.forEach(k=>{if(k<=j)return;const vk=v[k];if(vk.w===-vi.w&&vk.x===-vi.x&&vk.y===-vi.y&&vk.z===-vi.z)return;if(vk.w===-vj.w&&vk.x===-vj.x&&vk.y===-vj.y&&vk.z===-vj.z)return;f.push([i,j,k]);});});});return f;})();
+
+		const shapes={
+			"Tesseract":{vertices:tesseractVertices,edges:tesseractEdges,faces:tesseractFaces},
+			"Pentachoron":{vertices:pentachoronVertices,edges:pentachoronEdges,faces:pentachoronFaces},
+			"Orthoplex":{vertices:orthoplexVertices,edges:orthoplexEdges,faces:orthoplexFaces}
+		};
+		let currentShapeName='Tesseract';let currentShape=shapes[currentShapeName];let renderMode='wireframe';
+		const axisPoints4D=[{w:0,x:0,y:0,z:0},{w:mapAxisLength4D,x:0,y:0,z:0},{w:0,x:mapAxisLength4D,y:0,z:0},{w:0,x:0,y:mapAxisLength4D,z:0},{w:0,x:0,y:0,z:mapAxisLength4D}];const axisColors={W:'yellow',X:'red',Y:'blue',Z:'green'};
+		let angleXY=0.3;let angleXZ=0.3;let angleYZ=0;let angleWX=0.1;let angleWY=0.1;let angleWZ=0.1;
+		let isLeftDragging=false;let isRightDragging=false;let lastMouseX=0;let lastMouseY=0;
+
+		function rotate(pt,angle,ax1,ax2){const c=Math.cos(angle);const s=Math.sin(angle);const v1=pt[ax1];const v2=pt[ax2];const nPt={...pt};nPt[ax1]=v1*c-v2*s;nPt[ax2]=v1*s+v2*c;return nPt;}
+		function project4Dto3D(pt){const d=distance4D-pt.w;if(Math.abs(d)<1e-6){const l=10000;return{x:pt.x*l,y:pt.y*l,z:pt.z*l};} const wp=distance4D/d;return{x:pt.x*wp,y:pt.y*wp,z:pt.z*wp};}
+		function project3Dto2D(p3D,eyeOff=0,center={x:width/2,y:height/2}){const d=distance3D-p3D.z;if(Math.abs(d)<1e-6){const l=10000;const xs=p3D.x+eyeOff;return{x:xs*l*scale+center.x,y:-p3D.y*l*scale+center.y};} const zp=distance3D/d;const xs=p3D.x+eyeOff;const x2=xs*zp*scale+center.x;const y2=-p3D.y*zp*scale+center.y;return{x:x2,y:y2};}
+
+		function drawOrientationMap(projAxes2D){
+			const mapOX=width-mapSize-mapPadding;const mapOY=height-mapSize-mapPadding;const originScr=projAxes2D[0];
+			ctx.save();ctx.lineWidth=mapLineWidth;ctx.globalCompositeOperation='source-over';
+			const drawAx=(idx,col)=>{ctx.strokeStyle=col;ctx.beginPath();ctx.moveTo(mapOX,mapOY);ctx.lineTo(mapOX+(projAxes2D[idx].x-originScr.x),mapOY+(projAxes2D[idx].y-originScr.y));ctx.stroke();};
+			drawAx(1,axisColors.W);drawAx(2,axisColors.X);drawAx(3,axisColors.Y);drawAx(4,axisColors.Z);ctx.restore();
+		}
+
+		function draw(){
+			if(canvas.width!==width||canvas.height!==height){width=canvas.width;height=canvas.height;}
+			ctx.fillStyle='#000';ctx.fillRect(0,0,width,height);
+			const vertices=currentShape.vertices;const edges=currentShape.edges;const faces=currentShape.faces||[];
+			const rot=(pt)=>{let p={...pt};p=rotate(p,angleXY,'x','y');p=rotate(p,angleXZ,'x','z');p=rotate(p,angleYZ,'y','z');p=rotate(p,angleWX,'w','x');p=rotate(p,angleWY,'w','y');p=rotate(p,angleWZ,'w','z');return p;};
+			const rotatedVerts=vertices.map(rot);
+			const projected3D=rotatedVerts.map(project4Dto3D);
+
+			let facesToDraw=[];
+			if(renderMode!=='wireframe'&&faces.length>0){
+				faces.forEach((faceIndices)=>{
+					let avgZ=0;let valid=true;const faceVerts3D=faceIndices.map(vIdx=>{const p=projected3D[vIdx];if(!p)valid=false;else avgZ+=p.z;return p;});
+					if(valid){avgZ/=faceVerts3D.length;facesToDraw.push({indices:faceIndices,depth:avgZ});}
+				});
+				facesToDraw.sort((a,b)=>b.depth-a.depth);
+			}
+
+			if(renderMode!=='wireframe'&&facesToDraw.length>0){
+				const isOpaque=renderMode==='opaque';
+				ctx.globalCompositeOperation=isOpaque?'source-over':'lighter';
+				facesToDraw.forEach(fData=>{
+					const fIdx=fData.indices;
+					// Left Eye Face (Red)
+					ctx.fillStyle=isOpaque?`rgb(150,0,0)`:`rgba(255,50,50,${faceAlpha})`;ctx.strokeStyle=isOpaque?`rgb(200,0,0)`:`rgba(255,100,100,${faceAlpha*1.5})`;ctx.lineWidth=isOpaque?1:0.5;
+					ctx.beginPath();const p2L0=project3Dto2D(projected3D[fIdx[0]],+eyeSeparation/2);ctx.moveTo(p2L0.x,p2L0.y);
+					for(let k=1;k<fIdx.length;k++){const p2Lk=project3Dto2D(projected3D[fIdx[k]],+eyeSeparation/2);ctx.lineTo(p2Lk.x,p2Lk.y);}
+					ctx.closePath();ctx.fill();if(isOpaque)ctx.stroke();
+					// Right Eye Face (Cyan)
+					ctx.fillStyle=isOpaque?`rgb(0,150,150)`:`rgba(50,255,255,${faceAlpha})`;ctx.strokeStyle=isOpaque?`rgb(0,200,200)`:`rgba(100,255,255,${faceAlpha*1.5})`;
+					ctx.beginPath();const p2R0=project3Dto2D(projected3D[fIdx[0]],-eyeSeparation/2);ctx.moveTo(p2R0.x,p2R0.y);
+					for(let k=1;k<fIdx.length;k++){const p2Rk=project3Dto2D(projected3D[fIdx[k]],-eyeSeparation/2);ctx.lineTo(p2Rk.x,p2Rk.y);}
+					ctx.closePath();ctx.fill();if(isOpaque)ctx.stroke();
+				});
+			}
+
+			const drawEdgesOnTop=(renderMode==='wireframe')||(renderMode==='opaque');
+			if(drawEdgesOnTop){
+				ctx.globalCompositeOperation='lighter';ctx.lineWidth=edgeLineWidth;
+				edges.forEach(([i,j])=>{
+					const p3i=projected3D[i];const p3j=projected3D[j];if(!p3i||!p3j)return;
+					const p2il=project3Dto2D(p3i,+eyeSeparation/2);const p2jl=project3Dto2D(p3j,+eyeSeparation/2);ctx.strokeStyle='rgb(255,0,0)';ctx.beginPath();ctx.moveTo(p2il.x,p2il.y);ctx.lineTo(p2jl.x,p2jl.y);ctx.stroke();
+					const p2ir=project3Dto2D(p3i,-eyeSeparation/2);const p2jr=project3Dto2D(p3j,-eyeSeparation/2);ctx.strokeStyle='rgb(0,255,255)';ctx.beginPath();ctx.moveTo(p2ir.x,p2ir.y);ctx.lineTo(p2jr.x,p2jr.y);ctx.stroke();
+				});
+			}
+
+			const rotAxPts4D=axisPoints4D.map(rot);const projAxPts3D=rotAxPts4D.map(project4Dto3D);
+			const mapCenter={x:mapSize,y:mapSize};const projAxPts2D=projAxPts3D.map(p3d=>p3d?project3Dto2D(p3d,0,mapCenter):{x:NaN,y:NaN});
+			const scaleMapAx=(p2d,orig2d)=>{if(isNaN(p2d.x)||isNaN(orig2d.x))return{x:orig2d.x,y:orig2d.y};const dx=p2d.x-orig2d.x;const dy=p2d.y-orig2d.y;const len=Math.sqrt(dx*dx+dy*dy);const sf=len>1e-6?mapSize/len:0;return{x:orig2d.x+dx*sf,y:orig2d.y+dy*sf};};
+			const mapOrig2D=projAxPts2D[0];
+			if(!isNaN(mapOrig2D.x)){
+				const scaledProjAxPts2D=[mapOrig2D,scaleMapAx(projAxPts2D[1],mapOrig2D),scaleMapAx(projAxPts2D[2],mapOrig2D),scaleMapAx(projAxPts2D[3],mapOrig2D),scaleMapAx(projAxPts2D[4],mapOrig2D)];
+				drawOrientationMap(scaledProjAxPts2D);
+			}
+
+			ctx.globalCompositeOperation='source-over';requestAnimationFrame(draw);
+		}
+
+		function updateSliderUI(angleVar){const angVal=window[angleVar];const sId='rot'+angleVar.substring(5);const vId='val'+angleVar.substring(5);const slider=document.getElementById(sId);const valSpan=document.getElementById(vId);if(slider){let dA=angVal%(Math.PI*2);if(dA<0)dA+=Math.PI*2;const cA=Math.max(parseFloat(slider.min),Math.min(parseFloat(slider.max),dA));slider.value=cA.toFixed(3);}if(valSpan){let dA=angVal%(Math.PI*2);valSpan.textContent=dA.toFixed(2);}}
+
+		function setupControls(){
+			[{id:'rotWX',vId:'valWX',aVar:'angleWX'},{id:'rotWY',vId:'valWY',aVar:'angleWY'},{id:'rotWZ',vId:'valWZ',aVar:'angleWZ'}].forEach(s=>{const sl=document.getElementById(s.id);const vs=document.getElementById(s.vId);sl.addEventListener('input',(e)=>{const ang=parseFloat(e.target.value);window[s.aVar]=ang;vs.textContent=ang.toFixed(2);});const iAng=parseFloat(sl.value);vs.textContent=iAng.toFixed(2);window[s.aVar]=iAng;});
+			const dSlider=document.getElementById('anaglyphDepth');const dSpan=document.getElementById('valAnaglyphDepth');dSlider.addEventListener('input',(e)=>{eyeSeparation=parseFloat(e.target.value);dSpan.textContent=eyeSeparation.toFixed(2);});eyeSeparation=parseFloat(dSlider.value);dSpan.textContent=eyeSeparation.toFixed(2);
+			const shSel=document.getElementById('shapeSelect');shSel.addEventListener('change',(e)=>{currentShapeName=e.target.value;currentShape=shapes[currentShapeName];});currentShapeName=shSel.value;currentShape=shapes[currentShapeName];
+			const rSel=document.getElementById('renderModeSelect');rSel.addEventListener('change',(e)=>{renderMode=e.target.value;});renderMode=rSel.value;
+		}
+
+		function setupMouseInteraction(){
+			const start=(x,y,btn)=>{if(btn===0){isLeftDragging=true;isRightDragging=false;}else if(btn===2){isRightDragging=true;isLeftDragging=false;}else return;lastMouseX=x;lastMouseY=y;canvas.style.cursor='grabbing';};
+			const drag=(x,y)=>{if(!isLeftDragging&&!isRightDragging)return;const dx=x-lastMouseX;const dy=y-lastMouseY;if(isLeftDragging){angleXZ+=dx*rotationSpeed3D;angleXY-=dy*rotationSpeed3D;}else if(isRightDragging){angleWX+=dx*rotationSpeed4D;angleWZ-=dy*rotationSpeed4D;updateSliderUI('angleWX');updateSliderUI('angleWZ');}lastMouseX=x;lastMouseY=y;};
+			const end=()=>{if(isLeftDragging||isRightDragging){isLeftDragging=false;isRightDragging=false;canvas.style.cursor='grab';}};
+			canvas.addEventListener('mousedown',(e)=>start(e.clientX,e.clientY,e.button));
+			canvas.addEventListener('mousemove',(e)=>{if(e.buttons===1||e.buttons===2)drag(e.clientX,e.clientY);else if(isLeftDragging||isRightDragging)end();});
+			canvas.addEventListener('mouseup',(e)=>{if((e.button===0&&isLeftDragging)||(e.button===2&&isRightDragging))end();});
+			canvas.addEventListener('mouseleave',end);canvas.addEventListener('contextmenu',(e)=>e.preventDefault());
+			canvas.addEventListener('touchstart',(e)=>{if(e.touches.length===1){e.preventDefault();start(e.touches[0].clientX,e.touches[0].clientY,0);}},{passive:false});
+			canvas.addEventListener('touchmove',(e)=>{if(e.touches.length===1&&isLeftDragging){e.preventDefault();drag(e.touches[0].clientX,e.touches[0].clientY);}},{passive:false});
+			canvas.addEventListener('touchend',(e)=>{if(isLeftDragging)end();});canvas.addEventListener('touchcancel',end);
+		}
+
+		function setupScrollZoom(){canvas.addEventListener('wheel',(e)=>{e.preventDefault();const d=e.deltaY;let zA=-d*zoomSpeed;distance3D+=zA;distance3D=Math.max(minDistance3D,Math.min(maxDistance3D,distance3D));},{passive:false});}
+		function setupFullscreen(){const btn=document.getElementById('fullscreenBtn');const docEl=document.documentElement;const reqFS=docEl.requestFullscreen||docEl.mozRequestFullScreen||docEl.webkitRequestFullscreen||docEl.msRequestFullscreen;const exitFS=document.exitFullscreen||document.mozCancelFullScreen||document.webkitExitFullscreen||document.msExitFullscreen;const fsEl=()=>document.fullscreenElement||document.mozFullScreenElement||document.webkitFullscreenElement||document.msFullscreenElement;btn.addEventListener('click',()=>{if(!fsEl()){if(reqFS)reqFS.call(docEl).catch(err=>console.error(`FS err:${err.message}(${err.name})`));}else{if(exitFS)exitFS.call(document);}});const handleFS=()=>{const isFS=!!fsEl();btn.textContent=isFS?'Exit Fullscreen':'Enter Fullscreen';setTimeout(()=>{canvas.width=isFS?window.innerWidth:700;canvas.height=isFS?window.innerHeight:550;width=canvas.width;height=canvas.height;},100);};document.addEventListener('fullscreenchange',handleFS);document.addEventListener('webkitfullscreenchange',handleFS);document.addEventListener('mozfullscreenchange',handleFS);document.addEventListener('MSFullscreenChange',handleFS);}
+
+		// --- Init ---
+		setupControls();setupMouseInteraction();setupScrollZoom();setupFullscreen();draw();
+	</script>
+</body>
+</html>

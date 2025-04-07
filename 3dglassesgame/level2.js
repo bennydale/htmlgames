@@ -100,7 +100,7 @@ window.level2 = (function() {
     mountainPoints.forEach(pt => ctx.lineTo(pt.x, pt.y + mountainY));
     ctx.stroke();
     // Blue layer.
-    ctx.strokeStyle = 'blue';
+    ctx.strokeStyle = 'cyan';
     ctx.beginPath();
     ctx.moveTo(mountainPoints[0].x + disparityOffset, mountainPoints[0].y + mountainY);
     mountainPoints.forEach(pt => ctx.lineTo(pt.x + disparityOffset, pt.y + mountainY));
@@ -123,7 +123,7 @@ window.level2 = (function() {
     topMountainPoints.forEach(pt => ctx.lineTo(pt.x, pt.y + actualOffset));
     ctx.stroke();
     // Blue layer.
-    ctx.strokeStyle = 'blue';
+    ctx.strokeStyle = 'cyan';
     ctx.beginPath();
     ctx.moveTo(topMountainPoints[0].x + blueOffset, topMountainPoints[0].y + actualOffset);
     topMountainPoints.forEach(pt => ctx.lineTo(pt.x + blueOffset, pt.y + actualOffset));
@@ -175,7 +175,7 @@ window.level2 = (function() {
     ctx.closePath();
     ctx.stroke();
     // Blue layer.
-    ctx.strokeStyle = 'blue';
+    ctx.strokeStyle = 'cyan';
     ctx.beginPath();
     ctx.moveTo(tree.x + blueOffset + treeShape[0].x * tree.scale, tree.y + treeShape[0].y * tree.scale);
     treeShape.forEach(pt => ctx.lineTo(tree.x + blueOffset + pt.x * tree.scale, tree.y + pt.y * tree.scale));
@@ -198,7 +198,7 @@ window.level2 = (function() {
     ctx.beginPath();
     ctx.arc(enemy.x + redOffset, enemy.y, enemyRadius, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = 'blue';
+    ctx.fillStyle = 'cyan';
     ctx.beginPath();
     ctx.arc(enemy.x + blueOffset, enemy.y, enemyRadius, 0, Math.PI * 2);
     ctx.fill();

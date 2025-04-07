@@ -9,10 +9,15 @@
 </body>
 </html>
 <script>
+    function getRandomInt(min, max) {
+      const minCeiled = Math.ceil(min);
+      const maxFloored = Math.floor(max);
+      return Math.floor(Math.random() * (maxFloored - minCeiled) + minCeiled); // The maximum is exclusive and the minimum is inclusive
+    }
   const CALLRATE = 1000 / 24
   const canvas = document.getElementById('gameCanvas');
   const ctx = canvas.getContext('2d');
-  var player = {x: 310, y: 250, alive: true, momentumX:0, momentumY:0}
+  var player = {x: 310, y: 250, alive: true, momentumX:0, momentumY:0, animationIndex:0, animationDrawFilpped:false, hairIndex: getRandomInt(1, 6)}
   var gameState = 'loadingScreen'
   var playerSpeed = .05
   var titleBackground = new Image()
@@ -50,6 +55,49 @@
   var greenLightDuration = [
     6, 5, 5, 4, 4, 4, 4, 4, 3, 2,  
   ]
+  var hairStylesImages = {}
+  var playerAnimationImgs = []    
+  async function setUpPlayerAnimationImgs(){    
+    for(i = 1; i <= 10; i ++){       
+      await new Promise((resolve,reject)=>{
+        var playerImage = new Image()
+        playerImage.src = "runFrame" + i + ".png"                  
+        playerImage.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = 50;
+          canvas.height = 70;      
+          ctx.drawImage(playerImage, 52, 18, 108, 178, 0, 0, 50, 70)    
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          playerAnimationImgs.push(imageData)
+          resolve()
+        }
+      })                
+    }    
+
+    for(i = 1; i <= 10; i ++){      
+      for(j = 1; j <= 6; j++){
+        await new Promise((resolve,reject)=>{
+          var hair = new Image()
+          hair.src = "hairStyles/runFrameHair" + j + i + ".png"                  
+          hair.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 50;
+            canvas.height = 70;      
+            ctx.drawImage(hair, 52, 18, 108, 178, 0, 0, 50, 70)    
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            if(!hairStylesImages[j]){
+              hairStylesImages[j] = []
+            }
+            hairStylesImages[j].push(imageData)
+            resolve()
+          }
+        })
+      }        
+    }
+  }  
+
   function loadingScreen(){
 
 
@@ -254,11 +302,7 @@
       document.fonts.add(font)
     })
     
-    function getRandomInt(min, max) {
-      const minCeiled = Math.ceil(min);
-      const maxFloored = Math.floor(max);
-      return Math.floor(Math.random() * (maxFloored - minCeiled) + minCeiled); // The maximum is exclusive and the minimum is inclusive
-    }
+
     gInx = 0
 
 //   ctx.drawImage(previewBackground, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 ) 
@@ -317,7 +361,7 @@
       ctx.fillText("player speed: " + player.momentumY, 500, 80)
     }
 
-    function redLightGreenLight(){
+   async function redLightGreenLight(){
       titleSong.pause()
       if (cutscene1){
         if (!cutsceneSetUpComplete){
@@ -332,7 +376,7 @@
       ctx.drawImage(sandTexture, sandTextureX, sandTextureY)
 
       if(player.alive){
-        drawPlayer();
+       await drawPlayer();
       }else{
         drawDeadPlayer()
       }
@@ -343,15 +387,15 @@
       ctx.fillStyle = 'red';
       ctx.fillRect(player.x, player.y, 50, 17)
 
-    }
-  function drawPlayer() {
+    }    
+    async function  drawPlayer() {
 
     //round decimals to stop player from floating away.
     
-    console.log(player.momentumX)
+    
     player.y += player.momentumY
     player.x += player.momentumX
-    console.log(state )
+    
    if (state == "redLight" && player.momentumY != 0){
     player.alive = false;
    }
@@ -443,28 +487,70 @@
         player.momentumY = 0
       }
     }
+    if(player.momentumX != 0 || player.momentumY != 0){
+      player.animationIndex ++;      
+      if (player.animationIndex > 9){
+        player.animationIndex = 0
+        player.animationDrawFilpped = !player.animationDrawFilpped;        
+      }
+    }
 
-    ctx.fillStyle = 'yellow';
-    ctx.fillRect(player.x, player.y, 17, 50)
+    // PLAYER DRAWING
+    // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
+    const oldImageData = playerAnimationImgs[player.animationIndex]
+    const newImageData = new ImageData(50,70)
+    const oldHairData = hairStylesImages[player.hairIndex][player.animationIndex]
+    const newHairData = new ImageData(50,70)
+  
+    for (ix = 0; ix < 50; ix++) {
+      for (iy = 0; iy < 70; iy++) {
+        const color = getColorAtPos(oldImageData.data, ix, iy, 50);
+        const pos = player.animationDrawFilpped ? 49 - ix: ix;        
+        setColorAtPos(newImageData.data, pos, iy, 50, color);
 
-   
-   
+        const hColor = getColorAtPos(oldHairData.data, ix, iy, 50)
+        const hPos  = player.animationDrawFilpped ? 49 - ix: ix;
+        setColorAtPos(newHairData.data, hPos, iy, 50, hColor);
+      }
+    }
+    //ctx.drawImage(playerAnimationImgs[player.animationIndex], 52, 18, 108, 178, player.x, player.y, -50, 70)    
+    //ctx.drawImage(playerAnimationImgs[player.animationIndex], player.x, player.y)  
+    const bmp = await createImageBitmap(newImageData);
+    ctx.drawImage(bmp, player.x, player.y)
+    const hBmp = await createImageBitmap(newHairData)
+    ctx.drawImage(hBmp, player.x, player.y)
     
+  }
+  function getColorAtPos(array, x, y, width) {
+    var p = 4 * (x + y * width);
+    return array.slice(p, p + 4);
+  }
+  function setColorAtPos(array, x, y, width, color) {
+    var p = 4 * (x + y * width);
+    array[p] = color[0];     // Red
+    array[p + 1] = color[1]; // Green
+    array[p + 2] = color[2]; // Blue
+    array[p + 3] = color[3]; // Alpha
   }
   
   var fileDirectories
 async function setUp() {
   const response = await fetch("loadingScreenText.json");
   const data = await response.json()
+  await setUpPlayerAnimationImgs()  
   fileDirectories = data.data
-  setInterval( () => {
+  var waiting = false
+  setInterval(async () => {
+    if (waiting) return
+    
+    waiting = true
     if (gameState == 'loadingScreen'){
       loadingScreen();
     } else if(gameState == "titleCard"){titleCard()} else {
-      redLightGreenLight()
+     await redLightGreenLight()
 
     }
-
+    waiting = false
 
   }, CALLRATE)
 }

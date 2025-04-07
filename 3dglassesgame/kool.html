@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>3D Anaglyph Runner Game</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #000; color: #fff; font-family: sans-serif; }
+    #score { position: absolute; top: 10px; left: 10px; font-size: 24px; }
+    #gameOver { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      font-size: 48px; display: none; }
+  </style>
+</head>
+<body>
+  <div id="score">Score: 0</div>
+  <div id="gameOver">Game Over! Press R to Restart</div>
+  
+  <!-- Include Three.js and the AnaglyphEffect -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/effects/AnaglyphEffect.js"></script>
+  
+  <script>
+    let scene, camera, renderer, effect;
+    let player, playerSpeed = 0.2, moveLeft = false, moveRight = false;
+    let obstacles = [];
+    let score = 0;
+    let gameOver = false;
+    const obstacleSpeed = 0.3;
+    const obstacleSpawnInterval = 2000; // in milliseconds
+    let lastObstacleSpawn = 0;
+    
+    // Initialize the scene, camera, renderer, and objects.
+    function init() {
+      scene = new THREE.Scene();
+      
+      // Set up a perspective camera.
+      camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 5, 20);
+      camera.lookAt(0, 0, 0);
+      
+      // Create the renderer and attach it to the document.
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+      
+      // Wrap the renderer with the AnaglyphEffect for red/cyan 3D.
+      effect = new THREE.AnaglyphEffect(renderer);
+      effect.setSize(window.innerWidth, window.innerHeight);
+      
+      // Add a directional light.
+      const light = new THREE.DirectionalLight(0xffffff, 1);
+      light.position.set(0, 10, 10);
+      scene.add(light);
+      
+      // Create the player cube.
+      const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
+      const playerMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+      player = new THREE.Mesh(playerGeometry, playerMaterial);
+      player.position.set(0, 0.5, 0);
+      scene.add(player);
+      
+      // Create a ground plane.
+      const groundGeometry = new THREE.PlaneGeometry(20, 200);
+      const groundMaterial = new THREE.MeshPhongMaterial({ color: 0x555555 });
+      const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+      ground.rotation.x = - Math.PI / 2;
+      ground.position.z = -90;
+      scene.add(ground);
+      
+      // Set up event listeners.
+      window.addEventListener('resize', onWindowResize, false);
+      window.addEventListener('keydown', onKeyDown, false);
+      window.addEventListener('keyup', onKeyUp, false);
+    }
+    
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      effect.setSize(window.innerWidth, window.innerHeight);
+    }
+    
+    function onKeyDown(event) {
+      if (event.key === 'ArrowLeft' || event.key === 'a') {
+        moveLeft = true;
+      } else if (event.key === 'ArrowRight' || event.key === 'd') {
+        moveRight = true;
+      } else if (event.key === 'r' || event.key === 'R') {
+        if (gameOver) restartGame();
+      }
+    }
+    
+    function onKeyUp(event) {
+      if (event.key === 'ArrowLeft' || event.key === 'a') {
+        moveLeft = false;
+      } else if (event.key === 'ArrowRight' || event.key === 'd') {
+        moveRight = false;
+      }
+    }
+    
+    // Function to spawn an obstacle cube.
+    function spawnObstacle() {
+      const size = 1;
+      const geometry = new THREE.BoxGeometry(size, size, size);
+      const material = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+      const obstacle = new THREE.Mesh(geometry, material);
+      // Random horizontal position.
+      obstacle.position.x = Math.random() * 16 - 8;
+      obstacle.position.y = size / 2;
+      // Spawn far ahead in the z-direction.
+      obstacle.position.z = -100;
+      scene.add(obstacle);
+      obstacles.push(obstacle);
+    }
+    
+    // Simple collision detection based on distance.
+    function checkCollision(obstacle) {
+      const dx = player.position.x - obstacle.position.x;
+      const dz = player.position.z - obstacle.position.z;
+      const distance = Math.sqrt(dx * dx + dz * dz);
+      return distance < 1;
+    }
+    
+    // Restart the game.
+    function restartGame() {
+      obstacles.forEach(ob => scene.remove(ob));
+      obstacles = [];
+      score = 0;
+      document.getElementById('score').innerText = "Score: " + score;
+      document.getElementById('gameOver').style.display = 'none';
+      player.position.x = 0;
+      gameOver = false;
+      lastObstacleSpawn = performance.now();
+      animate(performance.now());
+    }
+    
+    // The main animation loop.
+    function animate(time) {
+      if (!gameOver) requestAnimationFrame(animate);
+      
+      // Spawn new obstacles at regular intervals.
+      if (time - lastObstacleSpawn > obstacleSpawnInterval) {
+        spawnObstacle();
+        lastObstacleSpawn = time;
+      }
+      
+      // Move the player based on key input.
+      if (moveLeft) {
+        player.position.x -= playerSpeed;
+      }
+      if (moveRight) {
+        player.position.x += playerSpeed;
+      }
+      // Keep the player within horizontal bounds.
+      player.position.x = Math.max(-8, Math.min(8, player.position.x));
+      
+      // Move obstacles toward the player and check for collisions.
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        obstacles[i].position.z += obstacleSpeed;
+        if (checkCollision(obstacles[i])) {
+          gameOver = true;
+          document.getElementById('gameOver').style.display = 'block';
+        }
+        // Remove obstacle if it passes the player and update score.
+        if (obstacles[i].position.z > 10) {
+          scene.remove(obstacles[i]);
+          obstacles.splice(i, 1);
+          if (!gameOver) {
+            score++;
+            document.getElementById('score').innerText = "Score: " + score;
+          }
+        }
+      }
+      
+      // Render the scene with the anaglyph effect.
+      effect.render(scene, camera);
+    }
+    
+    // Initialize and start the game.
+    init();
+    animate(0);
+  </script>
+</body>
+</html>
