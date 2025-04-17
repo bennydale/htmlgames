@@ -1,1 +1,625 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>3d game</title><style>body{margin:0;overflow:hidden;}</style></head><body><h1>3d game</h1><canvas id="raycastingCanvas" width="500" height="500" style="float:left;border:1px solid #000000"></canvas><canvas id="fpmap" width="500" height="500" style="float:left;border:1px solid #000000"></canvas><script>const viewAngle=90;viewStartAngle=270;function checkCollision(x,y,r){const ptX=Math.floor(x/blockSize.x),ptY=Math.floor(y/blockSize.y);for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){let tileX=ptX+dx,tileY=ptY+dy;if(tileX>=0&&tileX<map1[0].length&&tileY>=0&&tileY<map1.length)if(map1[tileY][tileX]==="1"){let wallX=tileX*blockSize.x,wallY=tileY*blockSize.y;if(x+r>wallX&&x-r<wallX+blockSize.x&&y+r>wallY&&y-r<wallY+blockSize.y)return true}}return false}const map1=["111111111111111111111111111111111111","100100000000000011111100000000000001","100100111111111110000100000100111111","100100000000000010000100000000000001","100111111111110010000000000000000001","100100000000000011111100000000000001","100100000000000010000100000000000001","100100000000000010000100000100000001","100000000000000010000000000100000000","100000000000000011111100000000000000","100000000000000000000000000000000001","100000000000000000000000000000000001","111111111111111111111111111111111111"],moveAmount=2,padUp=false,padDown=false,padLeft=false,padRight=false;let wallsNeedRedraw=true,canvas=document.getElementById("raycastingCanvas"),context=canvas.getContext("2d"),canvas3d=document.getElementById("fpmap"),cx3d=canvas3d.getContext("2d"),canvasWidth=canvas.width=500,canvasHeight=canvas.height=500,offsetX=canvas.offsetLeft,offsetY=canvas.offsetTop,player={x:440,y:425},badguy1={x:440,y:180,width:30,height:30,img:new Image()};badguy1.img.crossOrigin="Anonymous";badguy1.img.src="enemy1.png";let wall3dRayWidth=canvas3d.width/viewAngle;let degreeToRadian=d=>d/180*Math.PI;let Vector=function(x,y){this.x=x,this.y=y};Vector.fromAngle=function(a,v){v=v||new Vector();v.x=Math.cos(a),v.y=Math.sin(a);return v};Vector.dist=(v1,v2)=>{let dx=v1.x-v2.x,dy=v1.y-v2.y;return Math.sqrt(dx*dx+dy*dy)};Vector.prototype.mag=function(){return Math.sqrt(this.x*this.x+this.y*this.y+(this.z||0)*(this.z||0))};Vector.prototype.div=function(v){if(typeof v==="number"){this.x/=v,this.y/=v,this.z/=v}else{this.x/=v.x,this.y/=v.y,this.z/=v.z}};Vector.prototype.normalize=function(){let m=this.mag();m>0&&this.div(m)};let Boundary=function(aVec,bVec,imgObj=null){this.a=aVec,this.b=bVec,this.imgObj=imgObj};Boundary.prototype.draw=function(ctx){ctx.beginPath(),ctx.moveTo(this.a.x,this.a.y),ctx.lineTo(this.b.x,this.b.y),ctx.strokeStyle=this.imgObj?"rgba(255, 0, 0, 1)":"rgba(0, 0, 0, 1)",ctx.stroke()};let Ray=function(pos,angle){this.pos=pos,this.dir=Vector.fromAngle(angle)};Ray.prototype.cast=function(b){const x1=b.a.x,y1=b.a.y,x2=b.b.x,y2=b.b.y,x3=this.pos.x,y3=this.pos.y,x4=this.pos.x+this.dir.x,y4=this.pos.y+this.dir.y,den=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4);if(den===0)return;let t=((x1-x3)*(y3-y4)-(y1-y3)*(x3-x4))/den,u=-((x1-x2)*(y1-y3)-(y1-y2)*(x1-x3))/den;return t>0&&t<1&&u>0?new Vector(x1+t*(x2-x1),y1+t*(y2-y1)):void 0};let Particle=function(pos,divisor){this.pos=pos};Particle.prototype.update=function(x,y){this.pos.x=x,this.pos.y=y,this.rays=[],this.divisor=0.1;for(let a=viewStartAngle-(viewAngle/2);a<viewStartAngle+(viewAngle/2);a+=this.divisor)this.rays.push(new Ray(this.pos,degreeToRadian(a)))};Particle.prototype.look=function(ctx,walls){wall3dRayWidth=canvas3d.width/this.rays.length;let ch=canvas3d.height,maxHeight=ch*1.5;for(let i=0;i<this.rays.length;i++){let closest=null,record=Infinity,curretWall=null,closestBg,distBg;for(let w of walls){const pt=this.rays[i].cast(w);if(pt){const d=Vector.dist(this.pos,pt);if(d<record){record=d,closest=pt;if(w.imgObj){curretWall=w,closestBg=pt,distBg=d}}}}if(closest){ctx.beginPath(),ctx.moveTo(this.pos.x,this.pos.y),ctx.lineTo(closest.x,closest.y),ctx.strokeStyle='rgba(50, 80, 100, .4)',ctx.stroke();let rayAngle=Math.atan2(closest.y-this.pos.y,closest.x-this.pos.x),viewingAngle=degreeToRadian(viewStartAngle),deltaAngle=Math.atan2(Math.sin(rayAngle-viewingAngle),Math.cos(rayAngle-viewingAngle)),correctedDist=record*Math.cos(deltaAngle),height=Math.min((ch/correctedDist)*50,maxHeight);height=Math.max(height,2),cx3d.beginPath(),cx3d.moveTo(i*wall3dRayWidth,ch/2-(height/2)),cx3d.lineTo(i*wall3dRayWidth,ch/2+(height/2)),cx3d.strokeStyle=`rgba(50, 50, ${Math.min(255,height)}, 0.5)`,cx3d.stroke(),curretWall&&curretWall.imgObj&&(function(){let bgHeight=Math.min((ch/(distBg*Math.cos(deltaAngle)))*50,maxHeight),xCrop=closestBg.x-curretWall.a.x,tempCanvas=document.createElement("canvas");tempCanvas.width=1,tempCanvas.height=curretWall.imgObj.height;let tempCtx=tempCanvas.getContext("2d");tempCtx.drawImage(curretWall.imgObj.img,xCrop,0,1,curretWall.imgObj.height,0,0,1,curretWall.imgObj.height);let imageData=tempCtx.getImageData(0,0,1,curretWall.imgObj.height),data=imageData.data;for(let j=0;j<data.length;j+=4)if(data[j]===255&&data[j+1]===0&&data[j+2]===255)data[j+3]=0;tempCtx.putImageData(imageData,0,0),cx3d.drawImage(tempCanvas,0,0,1,curretWall.imgObj.height,i*wall3dRayWidth,ch/2-(bgHeight/2),wall3dRayWidth,bgHeight)})()}}};Particle.prototype.draw=function(ctx){ctx.beginPath(),ctx.arc(this.pos.x,this.pos.y,5,0,2*Math.PI),ctx.strokeStyle='rgba(255, 255, 255, 1)',ctx.stroke()};function getDistance(x1,y1,x2,y2){let y=x2-x1,x=y2-y1;return Math.sqrt(x*x+y*y)};let walls=[],radius=5,blockSize={x:context.canvas.width/map1[0].length,y:context.canvas.height/map1.length};function createWalls(){walls=[],function drawWalls(ctx){ctx.strokeStyle='rgba(0, 0, 0, 1)',ctx.lineWidth=1;for(let wall of walls){ctx.beginPath(),ctx.moveTo(wall.a.x,wall.a.y),ctx.lineTo(wall.b.x,wall.b.y),ctx.stroke()}if(badguy1&&badguy1.img){ctx.drawImage(badguy1.img,badguy1.x,badguy1.y,badguy1.width,badguy1.height),walls.push(new Boundary(new Vector(badguy1.x,badguy1.y),new Vector(badguy1.x+badguy1.width,badguy1.y),badguy1))}} map1.forEach((row,rowInx)=>{let penStart=null;for(let i=0;i<=row.length;i++){if(row[i]==="1"&&penStart===null)penStart=i;else if((row[i]==="0"||i===row.length)&&penStart!==null){walls.push(new Boundary(new Vector(penStart*blockSize.x,blockSize.y*rowInx),new Vector(i*blockSize.x,blockSize.y*rowInx))),walls.push(new Boundary(new Vector(i*blockSize.x,blockSize.y*rowInx),new Vector(i*blockSize.x,blockSize.y*(rowInx+1)))),penStart=null}}});} map1.forEach((row,rowInx)=>{let penStart=penStop=null;for(i=0;i<row.length;i++){if(row.charAt(i)==1&&penStart==null)penStart=i;if(penStart!==null&&row.charAt(i)==0)penStop=i;if(i==row.length-1)penStop=i;if(penStart!=null&&penStop!=null){walls.push(new Boundary(new Vector(penStart*blockSize.x,blockSize.y*rowInx),new Vector(penStop*blockSize.x,blockSize.y*rowInx))),walls.push(new Boundary(new Vector(penStop*blockSize.x,blockSize.y*rowInx),new Vector(penStop*blockSize.x,blockSize.y*rowInx+blockSize.y))),walls.push(new Boundary(new Vector(penStop*blockSize.x,blockSize.y*rowInx+blockSize.y),new Vector(penStart*blockSize.x,blockSize.y*rowInx+blockSize.y))),walls.push(new Boundary(new Vector(penStart*blockSize.x,blockSize.y*rowInx+blockSize.y),new Vector(penStart*blockSize.x,blockSize.y*rowInx))),penStart=penStop=null}}});let particle=new Particle(new Vector(200,200),1);let main=function(){positionPlayer(),context.clearRect(0,0,canvasWidth,canvasHeight),cx3d.clearRect(0,0,canvasWidth,canvasHeight);let ch=canvas3d.height,maxHeight=ch*1.5;drawWalls(context),particle.update(player.x,player.y),particle.look(context,walls,ch,maxHeight),particle.draw(context),requestAnimationFrame(main)};badguy1.img.complete?main():badguy1.img.onload=function(){main()};function calculateXYBasedOnAngle(){}function positionPlayer(){const alpha=degreeToRadian(viewStartAngle);let newX=player.x,newY=player.y;if(padUp){newX+=moveAmount*Math.cos(alpha),newY+=moveAmount*Math.sin(alpha)}if(padDown){newX-=moveAmount*Math.cos(alpha),newY-=moveAmount*Math.sin(alpha)}!checkCollision(newX,newY,radius)&&(player.x=newX,player.y=newY),padLeft&&(viewStartAngle-=moveAmount),padRight&&(viewStartAngle+=moveAmount),viewStartAngle=(viewStartAngle+360)%360}window.addEventListener("keydown",function(e){switch(e.key){case "ArrowUp":padUp=true;break;case "ArrowDown":padDown=true;break;case "ArrowLeft":padLeft=true;break;case "ArrowRight":padRight=true;break}}),window.addEventListener("keyup",function(e){switch(e.key){case "ArrowUp":padUp=false;break;case "ArrowDown":padDown=false;break;case "ArrowLeft":padLeft=false;break;case "ArrowRight":padRight=false;break}});</script></body></html>
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>3d game</title>
+</head>
+<style>
+	body {
+		margin: 0;
+		overflow: hidden;
+	}
+</style>
+
+
+<body>
+    <h1>3d game</h1>
+	<canvas id="raycastingCanvas" width="500" height="500" style="float:left;border:1px solid #000000"></canvas>
+    <canvas id="fpmap" width="500" height="500" style="float:left;border:1px solid #000000"></canvas>
+    <script>
+
+const viewAngle = 90;
+
+viewStartAngle = 270;
+                // Add this function for collision detection
+                function checkCollision(x, y, radius) {
+            const playerTileX = Math.floor(x / blockSize.x);
+            const playerTileY = Math.floor(y / blockSize.y);
+            
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    const tileX = playerTileX + dx;
+                    const tileY = playerTileY + dy;
+                    
+                    if (tileX >= 0 && tileX < map1[0].length && tileY >= 0 && tileY < map1.length) {
+                        if (map1[tileY][tileX] === '1') {
+                            const wallX = tileX * blockSize.x;
+                            const wallY = tileY * blockSize.y;
+                            
+                            if (x + radius > wallX && x - radius < wallX + blockSize.x &&
+                                y + radius > wallY && y - radius < wallY + blockSize.y) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+        const map1 =[
+        "111111111111111111111111111111111111",
+        "100100000000000011111100000000000001",
+        "100100111111111110000100000100111111",
+        "100100000000000010000100000000000001",
+        "100111111111110010000000000000000001",
+        "100100000000000011111100000000000001",
+        "100100000000000010000100000000000001",
+        "100100000000000010000100000100000001",
+        "100000000000000010000000000100000000",
+        "100000000000000011111100000000000000",
+        "100000000000000000000000000000000001",
+        "100000000000000000000000000000000001",
+        "111111111111111111111111111111111111",   
+        ]
+        var moveAmount = 2;
+        var padUp = false;
+        var padDown = false;
+        var padLeft = false;
+        var padRight = false;
+
+        let wallsNeedRedraw = true;
+
+
+
+        let canvas = document.getElementById("raycastingCanvas");
+        let context = canvas.getContext("2d");
+
+        let canvas3d = document.getElementById("fpmap");
+        let cx3d = canvas3d.getContext("2d");
+
+       
+
+        let canvasWidth = canvas.width = 500;
+        let canvasHeight = canvas.height = 500;
+        let offsetX = canvas.offsetLeft;
+        let offsetY = canvas.offsetTop;
+
+        let player = {
+            x: 440,
+            y: 425
+        };
+        let badguy1 ={
+            x: 440,
+            y: 180,
+            width:30,
+            height:30,
+            img: new Image()
+        }
+        /*
+        //badguy1.img.src = 'data:image/png;base64,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'
+        badguy1.img = new Image();
+        badguy1.img.crossOrigin = "Anonymous";
+        badguy1.img.src = 'enemy1.png';
+        let viewStartAngle = 270;
+        const viewAngle = 90
+        */
+        let wall3dRayWidth = canvas3d.width /viewAngle;
+
+        
+
+        // helper functions
+        let degreeToRadian = function(degree) {
+            return (degree / 180) * Math.PI;
+        };
+
+        // vector object
+        let Vector = function(x, y) {
+            this.x = x;
+            this.y = y;
+        };
+
+        // static vector object methods
+        Vector.fromAngle = function(angle, v) {
+            if (v === undefined || v === null) {
+                v = new Vector();
+            }
+            v.x = Math.cos(angle);
+            v.y = Math.sin(angle);
+            return v;
+        };
+
+        Vector.dist = function(v1, v2) {
+            let dx = v1.x - v2.x,
+                dy = v1.y - v2.y;
+            return Math.sqrt(dx * dx + dy * dy);
+        };
+
+        // vector object instance methods
+        Vector.prototype.mag = function() {
+            let x = this.x,
+                y = this.y,
+                z = this.z;
+            return Math.sqrt(x * x + y * y + z * z);
+        };
+
+        Vector.prototype.div = function(v) {
+            if (typeof v === 'number') {
+                this.x /= v;
+                this.y /= v;
+                this.z /= v;
+            } else {
+                this.x /= v.x;
+                this.y /= v.y;
+                this.z /= v.z;
+            }
+        };
+
+        Vector.prototype.normalize = function() {
+            let m = this.mag();
+            if (m > 0) {
+                this.div(m);
+            }
+        };
+
+        // boundary object a: vector, b: vector
+        let Boundary = function(aVec, bVec,imgObj=null) {
+            this.a = aVec;
+            this.b = bVec;
+            this.imgObj = imgObj
+        };
+
+        Boundary.prototype.draw = function(ctx) {
+            ctx.beginPath();
+            ctx.moveTo(this.a.x, this.a.y);
+            ctx.lineTo(this.b.x, this.b.y);
+           
+            if( this.imgObj){
+                ctx.strokeStyle = "rgba(255, 0, 0, 1)";
+            } else {
+                ctx.strokeStyle = "rgba(0, 0, 0, 1)";
+            }
+            ctx.stroke();
+        };
+
+        // ray object
+        let Ray = function(pos, angle) {
+            this.pos = pos;
+            this.dir = Vector.fromAngle(angle);
+        };
+
+        function drawWalls(context) {
+          context.strokeStyle = 'rgba(0, 0, 0, 1)';
+          context.lineWidth = 1;
+
+          for (let wall of walls) {
+              context.beginPath();
+              context.moveTo(wall.a.x, wall.a.y);
+              context.lineTo(wall.b.x, wall.b.y);
+              context.stroke();
+          }
+          /*
+          // Draw the bad guy if it exists
+          if (badguy1 && badguy1.img) {
+              // Create a temporary canvas to handle transparency
+              let tempCanvas = document.createElement('canvas');
+              tempCanvas.width = badguy1.width;
+              tempCanvas.height = badguy1.height;
+              let tempCtx = tempCanvas.getContext('2d');
+
+              // Draw the image onto the temporary canvas
+              tempCtx.drawImage(badguy1.img, 0, 0, badguy1.width, badguy1.height);
+
+              // Get image data and process for transparency
+              let imageData = tempCtx.getImageData(0, 0, badguy1.width, badguy1.height);
+              let data = imageData.data;
+              for (let i = 0; i < data.length; i += 4) {
+                  if (data[i] === 255 && data[i + 1] === 0 && data[i + 2] === 255) {
+                      data[i + 3] = 0; // Set alpha to 0 for magenta pixels
+                  }
+              }
+              tempCtx.putImageData(imageData, 0, 0);
+
+              // Draw the processed image onto the main canvas
+              context.drawImage(tempCanvas, badguy1.x, badguy1.y);
+
+              // Add the bad guy to the walls array for raycasting
+              walls.push(new Boundary(
+                  new Vector(badguy1.x, badguy1.y),
+                  new Vector(badguy1.x + badguy1.width, badguy1.y),
+                  badguy1
+              ));
+              */
+          }
+      
+
+        /* test line used to show position a distribution of rays
+        Ray.prototype.draw = function(ctx) {
+        ctx.translate(this.pos.x, this.pos.y);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(this.dir.x * 10, this.dir.y * 10);
+        ctx.strokeStyle = "rgba(255, 255, 255, 1)";
+        ctx.stroke();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        }; */
+
+        Ray.prototype.cast = function(boundary) {
+            const x1 = boundary.a.x;
+            const y1 = boundary.a.y;
+            const x2 = boundary.b.x;
+            const y2 = boundary.b.y;
+
+            const x3 = this.pos.x;
+            const y3 = this.pos.y;
+            const x4 = this.pos.x + this.dir.x;
+            const y4 = this.pos.y + this.dir.y;
+
+            const den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+            // if denominator is zero then the ray and boundary are parallel
+            if (den === 0) {
+                return;
+            }
+
+            // numerator divided by denominator
+            let t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
+            let u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
+
+            if (t > 0 && t < 1 && u > 0) {
+                const pt = new Vector();
+                pt.x = x1 + t * (x2 - x1);
+                pt.y = y1 + t * (y2 - y1);
+                return pt;
+            } else {
+                return;
+            }
+        };
+
+        // particle object
+        let Particle = function(pos, divisor) {
+            this.pos = pos;
+          
+        };
+
+        Particle.prototype.update = function(x, y) {
+            this.pos.x = x;
+            this.pos.y = y;
+            this.rays = [];
+            this.divisor = 0.1; // the degree of approximation
+            for (let a = viewStartAngle-(viewAngle/2); a <viewStartAngle+(viewAngle/2); a += this.divisor) {
+                this.rays.push(new Ray(this.pos, degreeToRadian(a)));
+            }
+        };
+
+        // Update the Particle.prototype.look function to handle transparency
+        Particle.prototype.look = function(ctx, walls) {
+            wall3dRayWidth = canvas3d.width / this.rays.length;
+            let ch = canvas3d.height;
+            let maxHeight = ch * 1.5;
+
+            for (let i = 0; i < this.rays.length; i++) {
+                let closest = null;
+                let record = Infinity;
+                let curretWall = null;
+                let closestBg, distBg;
+
+                for (let wall of walls) {
+                    const pt = this.rays[i].cast(wall);
+                    if (pt) {
+                        const dist = Vector.dist(this.pos, pt);
+                        if (dist < record) {
+                            record = dist;
+                            closest = pt;
+                            if (wall.imgObj) {
+                                curretWall = wall;
+                                closestBg = pt;
+                                distBg = dist;
+                            }
+                        }
+                    }
+                }
+
+                if (closest) {
+                    // Draw ray (optional, can be commented out for performance)
+                    ctx.beginPath();
+                    ctx.moveTo(this.pos.x, this.pos.y);
+                    ctx.lineTo(closest.x, closest.y);
+                    ctx.strokeStyle = 'rgba(50, 80, 100, .4)';
+                    ctx.stroke();
+
+                    // Calculate wall height
+                    let rayAngle = Math.atan2(closest.y - this.pos.y, closest.x - this.pos.x);
+                    let viewingAngle = degreeToRadian(viewStartAngle);
+                    let deltaAngle = rayAngle - viewingAngle;
+                    deltaAngle = Math.atan2(Math.sin(deltaAngle), Math.cos(deltaAngle));
+                    let correctedDist = record * Math.cos(deltaAngle);
+                    let height = Math.min((ch / correctedDist) * 50, maxHeight);
+                    height = Math.max(height, 2);
+
+                    // Draw wall
+                    cx3d.beginPath();
+                    cx3d.moveTo(i * wall3dRayWidth, ch / 2 - (height / 2));
+                    cx3d.lineTo(i * wall3dRayWidth, ch / 2 + (height / 2));
+                    cx3d.strokeStyle = `rgba(50, 50, ${Math.min(255, height)}, 0.5)`;
+                    cx3d.stroke();
+
+                    // Handle sprite (enemy) rendering with transparency
+                    if (curretWall && curretWall.imgObj) {
+                        let bgHeight = Math.min((ch / (distBg * Math.cos(deltaAngle))) * 50, maxHeight);
+                        let xCrop = closestBg.x - curretWall.a.x;
+
+                        // Create a temporary canvas for the sprite slice
+                        let tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = 1;
+                        tempCanvas.height = curretWall.imgObj.height;
+                        let tempCtx = tempCanvas.getContext('2d');
+
+                        // Draw the sprite slice onto the temporary canvas
+                        tempCtx.drawImage(curretWall.imgObj.img, xCrop, 0, 1, curretWall.imgObj.height, 0, 0, 1, curretWall.imgObj.height);
+
+                        // Get image data and process for transparency
+                        let imageData = tempCtx.getImageData(0, 0, 1, curretWall.imgObj.height);
+                        let data = imageData.data;
+                        for (let j = 0; j < data.length; j += 4) {
+                            if (data[j] === 255 && data[j + 1] === 0 && data[j + 2] === 255) {
+                                data[j + 3] = 0; // Set alpha to 0 for magenta pixels
+                            }
+                        }
+                        tempCtx.putImageData(imageData, 0, 0);
+
+                        // Draw the processed sprite slice
+                        cx3d.drawImage(tempCanvas, 0, 0, 1, curretWall.imgObj.height,
+                            i * wall3dRayWidth, ch / 2 - (bgHeight / 2), wall3dRayWidth, bgHeight);
+                    }
+                }
+            }
+        };
+
+        Particle.prototype.draw = function(ctx) {
+            ctx.beginPath();
+            ctx.arc(this.pos.x, this.pos.y, 5, 0, 2 * Math.PI);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 1)';
+            ctx.stroke();
+            /* test line to show all rays
+            for (let i = 0; i < this.rays.length; i++) {
+                this.rays[i].draw(ctx);
+            }*/
+        };
+        function getDistance(x1, y1, x2, y2){
+            let y = x2 - x1;
+            let x = y2 - y1;
+            
+            return Math.sqrt(x * x + y * y);
+        }
+        // test code
+        let walls = [];
+        /*
+        let wall = new Boundary(new Vector(375, 250), new Vector(375, 50));
+        walls.push(wall);
+        let wall2 = new Boundary(new Vector(100, 100), new Vector(250, 250));
+        walls.push(wall2);
+        let wall3 = new Boundary(new Vector(50, 100), new Vector(250, 100));
+        walls.push(wall3);
+        let wall4 = new Boundary(new Vector(50, 50), new Vector(250, 50));
+        walls.push(wall4);
+        */
+        const radius = 5;
+        const blockSize = {x:context.canvas.width/map1[0].length, y:context.canvas.height/map1.length}
+
+        function createWalls() {
+          walls = [];
+          const blockSize = {
+              x: context.canvas.width / map1[0].length,
+              y: context.canvas.height / map1.length
+          };
+
+          function drawWalls(context) {
+            context.strokeStyle = 'rgba(0, 0, 0, 1)';
+            context.lineWidth = 1;
+
+            for (let wall of walls) {
+                context.beginPath();
+                context.moveTo(wall.a.x, wall.a.y);
+                context.lineTo(wall.b.x, wall.b.y);
+                context.stroke();
+            }
+
+            // Draw the bad guy if it exists
+            if (badguy1 && badguy1.img) {
+              context.drawImage(
+                  badguy1.img, 
+                  badguy1.x, 
+                  badguy1.y, 
+                  badguy1.width, 
+                  badguy1.height
+              );
+
+              // Add the bad guy to the walls array for raycasting
+              walls.push(new Boundary(
+                  new Vector(badguy1.x, badguy1.y),
+                  new Vector(badguy1.x + badguy1.width, badguy1.y),
+                  badguy1
+              ));
+            }
+          }
+
+          map1.forEach((row, rowInx) => {
+              let penStart = null;
+              for (let i = 0; i <= row.length; i++) {
+                  if (row[i] === '1' && penStart === null) {
+                      penStart = i;
+                  } else if ((row[i] === '0' || i === row.length) && penStart !== null) {
+                      walls.push(
+                          new Boundary(
+                              new Vector(penStart * blockSize.x, blockSize.y * rowInx),
+                              new Vector(i * blockSize.x, blockSize.y * rowInx)
+                          )
+                      );
+                      walls.push(
+                          new Boundary(
+                              new Vector(i * blockSize.x, blockSize.y * rowInx),
+                              new Vector(i * blockSize.x, blockSize.y * (rowInx + 1))
+                          )
+                      );
+                      penStart = null;
+                  }
+              }
+          });
+        }
+
+        map1.forEach((row,rowInx) =>{
+            let penStart = penStop = null;
+            for(i=0;i<row.length;i++){
+                if(row.charAt(i)==1 && penStart==null){
+                    penStart = i;
+                }
+                if( penStart !== null && row.charAt(i)==0){
+                    penStop = i;
+                }
+                // or at end .. just pend stop:
+                if( i==row.length-1){
+                    penStop = i;
+                }
+                if(penStart!=null && penStop!=null){
+                    walls.push(
+                        new Boundary(
+                            new Vector(penStart*blockSize.x, blockSize.y*rowInx),
+                            new Vector(penStop*blockSize.x, blockSize.y*rowInx )
+                        )
+                    )
+
+                    walls.push(
+                        new Boundary(
+                            new Vector(penStop*blockSize.x, blockSize.y*rowInx ),
+                            new Vector(penStop*blockSize.x, blockSize.y*rowInx + blockSize.y)
+                        )
+                    )
+                    walls.push(
+                        new Boundary(
+                            new Vector(penStop*blockSize.x, blockSize.y*rowInx + blockSize.y),
+                            new Vector(penStart*blockSize.x, blockSize.y*rowInx + blockSize.y)
+                        )
+                    )
+                    walls.push(
+                        new Boundary(
+                            new Vector(penStart*blockSize.x, blockSize.y*rowInx + blockSize.y),
+                            new Vector(penStart*blockSize.x, blockSize.y*rowInx )
+                        )
+                    )
+                    penStart = penStop = null;
+                }
+            }
+        });
+
+
+        let particle = new Particle(new Vector(200, 200), 1);
+
+        // main loop
+       
+        let main = function() {
+        positionPlayer();
+        context.clearRect(0, 0, canvasWidth, canvasHeight);
+        cx3d.clearRect(0, 0, canvasWidth, canvasHeight);
+        
+        // Pre-calculate common values
+        let ch = canvas3d.height;
+        let maxHeight = ch * 1.5;
+        
+        // Draw walls and bad guy
+        drawWalls(context);
+        
+        // Update and draw particle
+        particle.update(player.x, player.y);
+        particle.look(context, walls, ch, maxHeight);
+        particle.draw(context);
+
+        // Use requestAnimationFrame for smoother animation
+        requestAnimationFrame(main);
+      };
+        if( badguy1.img.complete ){
+            main();
+        } else{
+            badguy1.img.onload = () =>{
+                main();
+            }
+        }
+        /*
+        interal = setInterval(() => {
+            badguy1.x+=Math.random()*5 - Math.random()*5
+            badguy1.y+=Math.random()*5 - Math.random()*5
+        }, 50);
+*/
+        function calculateXYBasedOnAngle(){
+
+        }
+      // Update the positionPlayer function
+      function positionPlayer() {
+        const alpha = degreeToRadian(viewStartAngle);
+        let newX = player.x;
+        let newY = player.y;
+
+        if (padUp) {
+            newX += moveAmount * Math.cos(alpha);
+            newY += moveAmount * Math.sin(alpha);
+        }
+        if (padDown) {
+            newX -= moveAmount * Math.cos(alpha);
+            newY -= moveAmount * Math.sin(alpha);
+        }
+
+        // Check collision before updating player position
+        if (!checkCollision(newX, newY, radius)) {
+            player.x = newX;
+            player.y = newY;
+        }
+
+        if (padLeft) {
+            viewStartAngle -= moveAmount;
+        }
+        if (padRight) {
+            viewStartAngle += moveAmount;
+        }
+
+        // Normalize viewStartAngle to keep it between 0 and 360
+        viewStartAngle = (viewStartAngle + 360) % 360;
+    }
+
+      window.addEventListener("keydown", pressedKey);
+        function pressedKey(event) {
+            switch (event.key) {
+                case "ArrowUp":
+                    padUp = true;
+                    break;
+                case "ArrowDown":
+                    padDown = true;
+                    break;
+                case "ArrowLeft":
+                    padLeft = true;
+                    break;
+                case "ArrowRight":
+                    padRight = true;
+                    break;
+            }
+        }
+        window.addEventListener("keyup", pressedKeyUp);
+          function pressedKeyUp(event) {
+              switch (event.key) {
+                  case "ArrowUp":
+                      padUp = false;
+                      break;
+                  case "ArrowDown":
+                      padDown = false;
+                      break;
+                  case "ArrowLeft":
+                      padLeft = false;
+                      break;
+                  case "ArrowRight":
+                      padRight = false;
+                      break;
+              }
+          }
+
+        </script>
+</body>
+</html>

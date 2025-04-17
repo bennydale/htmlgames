@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Audio ↔ Printable PDF Waveform (10 s excerpt + Playback)</title>
+  <style>
+    /* Letter page size @ 72 dpi */
+    :root { --page-w: 612px; --page-h: 792px; }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      padding: 1rem;
+      background: #f7f7f7;
+    }
+
+    #controls { margin-bottom: 1rem; display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; }
+
+    #waveform {
+      width: 100%;
+      max-width: var(--page-w);
+      height: auto;
+      border: 1px solid #ccc;
+      background: #fff;
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+
+    audio { width: 100%; max-width: var(--page-w); }
+    #error { color: #c00; margin-top: 0.4rem; }
+  </style>
+</head>
+<body>
+  <h1>Audio → B/W PDF Waveform (10‑second excerpt) with Playback</h1>
+
+  <div id="controls">
+    <input type="file" id="file-input" accept="audio/mpeg,.mp3,audio/*">
+    <button id="export-pdf" disabled>Export PDF</button>
+  </div>
+
+  <!-- Waveform preview (exact letter size) -->
+  <canvas id="waveform" width="612" height="792"></canvas>
+
+  <!-- Audio player hidden until a file is loaded -->
+  <audio id="player" controls hidden></audio>
+  <div id="error" hidden></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script>
+    (() => {
+      const MAX_SECONDS = 10; // visualize / playback first 10 seconds
+
+      const fileInput  = document.getElementById('file-input');
+      const exportBtn  = document.getElementById('export-pdf');
+      const canvas     = document.getElementById('waveform');
+      const ctx        = canvas.getContext('2d');
+      const errorBox   = document.getElementById('error');
+      const audioElm   = document.getElementById('player');
+
+      let audioBuffer = null;
+      drawPlaceholder();
+
+      /* ---------- File select ---------- */
+      fileInput.addEventListener('change', async () => {
+        resetUI();
+        const file = fileInput.files[0];
+        if (!file) return;
+        try {
+          // Decode for waveform
+          const arrayBuf = await file.arrayBuffer();
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          audioBuffer    = await audioCtx.decodeAudioData(arrayBuf);
+          drawWaveform(audioBuffer);
+          exportBtn.disabled = false;
+
+          // Prepare audio element (object URL)
+          const src = URL.createObjectURL(file);
+          audioElm.src = src;
+          audioElm.currentTime = 0;
+          audioElm.hidden = false;
+          audioElm.load();
+        } catch (e) {
+          console.error(e);
+          showError('Could not decode audio. Try MP3, WAV, or OGG.');
+        }
+      });
+
+      /* ---------- PDF export ---------- */
+      exportBtn.addEventListener('click', () => {
+        if (!audioBuffer) return;
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({ unit: 'pt', format: 'letter' });
+        const imgData = canvas.toDataURL('image/png');
+        pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
+        pdf.save('waveform.pdf');
+      });
+
+      /* ---------- Limit playback to first 10 s ---------- */
+      audioElm.addEventListener('timeupdate', () => {
+        if (audioElm.currentTime >= MAX_SECONDS) {
+          audioElm.pause();
+          audioElm.currentTime = 0;
+        }
+      });
+
+      /* ---------- Helpers ---------- */
+      function drawPlaceholder() {
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#666';
+        ctx.font = '20px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Select an audio file (first 10 s will render)…', canvas.width / 2, canvas.height / 2);
+      }
+
+      function drawWaveform(buffer) {
+        const sampleRate  = buffer.sampleRate;
+        const chanData    = buffer.getChannelData(0);
+        const sampleCount = Math.min(sampleRate * MAX_SECONDS, chanData.length);
+        const samples     = chanData.subarray(0, sampleCount);
+
+        const samplesPerPixel = samples.length / canvas.width;
+        const midY = canvas.height / 2;
+
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#000';
+        ctx.beginPath();
+
+        let index = 0;
+        for (let x = 0; x < canvas.width; x++) {
+          const start = Math.floor(index);
+          const end   = Math.floor(index + samplesPerPixel);
+          let min = 1, max = -1;
+          for (let i = start; i < end; i++) {
+            const v = samples[i] || 0;
+            if (v < min) min = v;
+            if (v > max) max = v;
+          }
+          const y1 = midY + min * midY;
+          const y2 = midY + max * midY;
+          ctx.moveTo(x + 0.5, y1);
+          ctx.lineTo(x + 0.5, y2);
+          index += samplesPerPixel;
+        }
+        ctx.stroke();
+      }
+
+      function resetUI() {
+        exportBtn.disabled = true;
+        errorBox.hidden = true;
+        audioElm.hidden = true;
+        audioElm.pause();
+        drawPlaceholder();
+      }
+
+      function showError(msg) {
+        errorBox.textContent = msg;
+        errorBox.hidden = false;
+        exportBtn.disabled = true;
+      }
+    })();
+  </script>
+</body>
+</html>
