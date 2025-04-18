@@ -166,6 +166,7 @@
     ctx.fillText("start", titleForegroundPosition.x + 460, titleForegroundPosition.y + 323)
     titleSong.play();
   }
+  
 
   document.addEventListener('keydown', function(e) {
         if (e.key === 'ArrowUp'){
@@ -216,13 +217,13 @@
       }
     } else if (gameState == "redLightGreenLight"){
       if (e.offsetX > 450 && e.offsetX < 570 && e.offsetY > 423 && e.offsetY < 473) {
-          startCoundown()
+          
           cutsceneSetUpComplete = true
           clearInterval(updateCutsceneInterval)
           cutscene1 = false
           var vid = document.getElementsByTagName("video")[0]
           vid.pause()
-          
+          startCoundown()
       }
     }
     
@@ -291,6 +292,7 @@
       vid.addEventListener("ended", ()=>{
         clearInterval(updateCutsceneInterval)
         cutscene1 = false
+        startCoundown()
       })
 
     }
@@ -387,8 +389,10 @@
       if (cutscene1){
         if (!cutsceneSetUpComplete){
           
+          
           setUpAndPlay();
           cutsceneSetUpComplete = true
+          
         }
         
         return
