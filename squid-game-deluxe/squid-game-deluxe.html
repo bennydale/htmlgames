@@ -57,6 +57,7 @@
   ]
   var hairStylesImages = {}
   var playerAnimationImgs = []    
+  var playerDeathImgs = []
   async function setUpPlayerAnimationImgs(){    
     for(i = 1; i <= 10; i ++){       
       await new Promise((resolve,reject)=>{
@@ -74,6 +75,17 @@
         }
       })                
     }    
+    for(i = 1; i <= 12; i ++){       
+      await new Promise((resolve,reject)=>{
+        var playerImage = new Image()
+        playerImage.src = "deathAnimation/deathAnimation2/deathFrame" + i + ".png"                  
+        playerImage.onload = () => {  
+          //const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          playerDeathImgs.push(playerImage)
+          resolve()
+        }
+      })                
+    }
 
     for(i = 1; i <= 10; i ++){      
       for(j = 1; j <= 6; j++){
@@ -287,7 +299,7 @@
     var sandTextureY = -3601.7
     var sandTextureX = -250
     var previewX =  100
-    var countDownSecondsLeft = 61
+    var countDownSecondsLeft = 119
     function startCoundown(){
       setInterval( ()=> {
         countDownSecondsLeft --
@@ -297,7 +309,7 @@
       }, 1000)
     }
   
-    f = new FontFace('calc', 'url(digital-7.ttf)');
+    f = new FontFace('calc', 'url(calc.ttf)');
     f.load().then(function(font) {
       document.fonts.add(font)
     })
@@ -354,8 +366,17 @@
       }
 
       ctx.fillStyle = 'red'
-      ctx.font = "50px calc"            
-      ctx.fillText(countDownSecondsLeft, 570, 40)
+      ctx.font = "50px calc"   
+      var countDownSecondsLeftExtra = countDownSecondsLeft   
+      if (countDownSecondsLeft > 69&& countDownSecondsLeft < 120){
+        ctx.fillText("01:" + (countDownSecondsLeftExtra - 60), 520, 40)
+      } else if (countDownSecondsLeft > 59&& countDownSecondsLeft < 70){
+        ctx.fillText("01:0" + (countDownSecondsLeftExtra - 60), 520, 40)
+      } else if(countDownSecondsLeft > 9 && countDownSecondsLeft < 60){
+        ctx.fillText("00:"+countDownSecondsLeft, 520, 40)
+
+      } else {ctx.fillText("00:0"+countDownSecondsLeft, 520, 40)}
+      
       //draw player speed
       ctx.font = "20px calc" 
       ctx.fillText("player speed: " + player.momentumY, 500, 80)
@@ -378,14 +399,15 @@
       if(player.alive){
        await drawPlayer();
       }else{
-        drawDeadPlayer()
+        await drawDeadPlayer()
       }
       
       preview()
     }
+    var deathAnimationIndex = 0
     function drawDeadPlayer(){
       ctx.fillStyle = 'red';
-      ctx.fillRect(player.x, player.y, 50, 17)
+      ctx.drawImage(playerDeathImgs[deathAnimationIndex], player.x, player.y, 50, 17)
 
     }    
     async function  drawPlayer() {
