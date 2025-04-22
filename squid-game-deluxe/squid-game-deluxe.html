@@ -55,6 +55,8 @@
   var greenLightDuration = [
     6, 5, 5, 4, 4, 4, 4, 4, 3, 2,  
   ]
+  var gunSound = new Audio("gunSound.mp3")
+  
   var hairStylesImages = {}
   var playerAnimationImgs = []    
   var playerDeathImgs = []
@@ -91,7 +93,7 @@
       for(j = 1; j <= 6; j++){
         await new Promise((resolve,reject)=>{
           var hair = new Image()
-          hair.src = "hairStyles/runFrameHair" + j + i + ".png"                  
+          hair.src = "hairStyles/runFrameHair/runFrameHair" + j + i + ".png"                  
           hair.onload = () => {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -409,10 +411,18 @@
       preview()
     }
     var deathAnimationIndex = 0
+    var deathAnimationIndexPart2 = 0
     function drawDeadPlayer(){
       ctx.fillStyle = 'red';
-      ctx.drawImage(playerDeathImgs[deathAnimationIndex], player.x, player.y, 50, 17)
-
+      
+      ctx.drawImage(playerDeathImgs[deathAnimationIndex], player.x - 60, player.y, 120, 90)
+      if (deathAnimationIndex < 11){
+        deathAnimationIndexPart2 ++
+        if (deathAnimationIndexPart2 >= 3){
+          deathAnimationIndex ++
+          deathAnimationIndexPart2 = 0
+        }
+      }
     }    
     async function  drawPlayer() {
 
@@ -424,9 +434,11 @@
     
    if (state == "redLight" && player.momentumY != 0){
     player.alive = false;
+    gunSound.play()
    }
    if (state == "redLight" && player.momentumX != 0){
     player.alive = false;
+    gunSound.play()
    }
     if (player.y < 200 && sandTextureY < 0){
       player.y -= player.momentumY
