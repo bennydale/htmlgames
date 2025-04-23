@@ -17,7 +17,7 @@
   const CALLRATE = 1000 / 24
   const canvas = document.getElementById('gameCanvas');
   const ctx = canvas.getContext('2d');
-  var player = {x: 310, y: 250, alive: true, momentumX:0, momentumY:0, animationIndex:0, animationDrawFilpped:false, hairIndex: getRandomInt(1, 7)}
+  var player = {x: 310, y: 250, alive: true, momentumX:0, momentumY:0, animationIndex:0, animationDrawFilpped:false, hairIndex: getRandomInt(1, 7), animationIndex:0}
   var gameState = 'loadingScreen'
   var playerSpeed = .05
   var titleBackground = new Image()
@@ -49,14 +49,25 @@
   var sandTexture = new Image()
   sandTexture.src = ("sandTexture.png")
   var dollState = "greenLight" // turning, red ligt
-  var activeKeys= {up: false, down: false, left: false, right: false, shift: false}
+  var activeKeys= {up: false, down: false, left: false, right: false, shift: false, w:false}
   var maxPlayerSpeed = 4
   var maxPlayerRunningSpeed = 8
   var greenLightDuration = [
     6, 5, 5, 4, 4, 4, 4, 4, 3, 2,  
   ]
+
+  var npcs = []
+  for (i = 0; i <= 50; i ++){
+    var npc = JSON.parse(JSON.stringify(player))
+    npc.x = getRandomInt(0, 640)
+    npc.y = getRandomInt(0, 480)
+    npc.hairIndex = getRandomInt(1,7)
+    npcs.push(npc)
+  }
+
   var gunSound = new Audio("gunSound.mp3")
-  
+  var titleImage = new Image()
+  titleImage.src = ("pvlogo.png")
   var hairStylesImages = {}
   var playerAnimationImgs = []    
   var playerDeathImgs = []
@@ -112,6 +123,8 @@
     }
   }  
 
+
+
   function loadingScreen(){
 
 
@@ -121,7 +134,7 @@
     ctx.fillRect (0, 0, 640, 480);
     ctx.fillStyle = "white"; 
     ctx.fillRect (10, 230, loadingBar, 20)
-
+    ctx.drawImage(titleImage, 230, 100, 150, 120)
     
 
     if (i >= fileDirectories.length) {
@@ -183,6 +196,18 @@
         if (e.key === 'ArrowRight'){
           activeKeys.right = true
         } 
+        if (e.key === 'w'){
+          activeKeys.up = true
+        }
+        if (e.key === 's'){
+          activeKeys.down = true
+        }
+        if (e.key === 'a'){
+          activeKeys.left = true
+        }
+        if(e.key === 'd'){
+          activeKeys.right = true
+        }
     });
     document.addEventListener('keydown', function(e){
         if (e.key === 'Shift'){
@@ -207,6 +232,18 @@
         if (e.key === 'ArrowRight'){
           activeKeys.right = false
         } 
+        if (e.key === 'w'){
+          activeKeys.up = false
+        }
+        if (e.key === 's'){
+          activeKeys.down = false
+        }
+        if (e.key === 'a'){
+          activeKeys.left = false
+        }
+        if(e.key === 'd'){
+          activeKeys.right = false
+        }
     });
     canvas.addEventListener('click', (e)=> {
       if(gameState == "loadingScreen"){
@@ -383,7 +420,7 @@
       
       //draw player speed
       ctx.font = "20px calc" 
-      ctx.fillText("player speed: " + player.momentumY, 500, 80)
+      ctx.fillText("player speed: " + player.momentumY, 480, 80)
     }
 
    async function redLightGreenLight(){
@@ -407,6 +444,7 @@
       }else{
         await drawDeadPlayer()
       }
+      await drawNpcs()
       
       preview()
     }
@@ -424,6 +462,41 @@
         }
       }
     }    
+
+
+    // ------------DRAWING PLAYTER AND NPCS-------------
+
+
+    async function drawNpcs(){
+      for(i=0;i<npcs.length;i++){
+        var cureentNpc = npcs[i];
+        // PLAYER DRAWING
+        // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
+        const oldImageData = playerAnimationImgs[cureentNpc.animationIndex]
+        const newImageData = new ImageData(50,70)
+        const oldHairData = hairStylesImages[cureentNpc.hairIndex][cureentNpc.animationIndex]
+        const newHairData = new ImageData(50,70)
+      
+        for (ix = 0; ix < 50; ix++) {
+          for (iy = 0; iy < 70; iy++) {
+            const color = getColorAtPos(oldImageData.data, ix, iy, 50);
+            const pos = cureentNpc.animationDrawFilpped ? 49 - ix: ix;        
+            setColorAtPos(newImageData.data, pos, iy, 50, color);
+
+            const hColor = getColorAtPos(oldHairData.data, ix, iy, 50)
+            const hPos  = cureentNpc.animationDrawFilpped ? 49 - ix: ix;
+            setColorAtPos(newHairData.data, hPos, iy, 50, hColor);
+          }
+        }
+        //ctx.drawImage(playerAnimationImgs[player.animationIndex], 52, 18, 108, 178, player.x, player.y, -50, 70)    
+        //ctx.drawImage(playerAnimationImgs[player.animationIndex], player.x, player.y)  
+        const bmp = await createImageBitmap(newImageData);
+        ctx.drawImage(bmp, cureentNpc.x, cureentNpc.y)
+        const hBmp = await createImageBitmap(newHairData)
+        ctx.drawImage(hBmp, cureentNpc.x, cureentNpc.y)
+      }
+    }
+    
     async function  drawPlayer() {
 
     //round decimals to stop player from floating away.
