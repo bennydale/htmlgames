@@ -18,6 +18,13 @@
   const canvas = document.getElementById('gameCanvas');
   const ctx = canvas.getContext('2d');
   var player = {x: 310, y: 250, alive: true, momentumX:0, momentumY:0, animationIndex:0, animationDrawFilpped:false, hairIndex: getRandomInt(1, 7), animationIndex:0}
+  
+  var ORIGINAL_SAND_X = -250
+  var ORIGINAL_SAND_Y = -3601.7
+
+  var sandTextureY = ORIGINAL_SAND_Y
+  var sandTextureX = ORIGINAL_SAND_X
+
   var gameState = 'loadingScreen'
   var playerSpeed = .05
   var titleBackground = new Image()
@@ -34,6 +41,11 @@
   var i = 0
   var l = 0
   var e = 0
+  var b = 0
+
+  var drawDeathSplat = false
+  var drawDeathSplatAlpha = 1
+
   var cutscene1 = true
   var previewBackground = new Image()
   previewBackground.src = "previewBackground.png"
@@ -48,29 +60,51 @@
   var titleSong = new Audio('titleSong.mp3')
   var sandTexture = new Image()
   sandTexture.src = ("sandTexture.png")
+  var bloodOverlay = new Image()
+  bloodOverlay.src = "bloodOverlay.png"
+  var bloodOverlay2 = new Image()
+  bloodOverlay2.src = "bloodOverlay2.png"
   var dollState = "greenLight" // turning, red ligt
   var activeKeys= {up: false, down: false, left: false, right: false, shift: false, w:false}
   var maxPlayerSpeed = 4
   var maxPlayerRunningSpeed = 8
+  var round1 = new Audio()
+  var playerWon = false
+  round1.src = "round1.mp3"
   var greenLightDuration = [
-    6, 5, 5, 4, 4, 4, 4, 4, 3, 2,  
+    6, 5, 5, 4, 4, 4, 4, 4, 3, 2, 1 
   ]
-
+  var deathMessagesIndex = getRandomInt(1, 8)
+  var deathMessages = [
+    "I will pay you back, I promise!",
+    "One more game! one more game!",
+    "can I have one more chance?",
+    "I just moved, didn't I?",
+    "AHH A BEE A BEE, GET IT OFF ME",
+    "They probably didn't notice...",
+    "Stop fooling around, get up.",
+    "this isin't funny anymore, get up!"
+  ]
   var npcs = []
-  for (i = 0; i <= 50; i ++){
+  for (i = 0; i <= 100; i ++){
     var npc = JSON.parse(JSON.stringify(player))
     npc.x = getRandomInt(0, 640)
-    npc.y = getRandomInt(0, 480)
+    npc.y = getRandomInt(0, 480) - 250
+    npc.deathAnimationIndex = 0
+    npc.deathAnimationIndexPart2 = 0
     npc.hairIndex = getRandomInt(1,7)
     npcs.push(npc)
   }
+  npcs.sort((a,b) => { return a.y - b.y} )
 
   var gunSound = new Audio("gunSound.mp3")
+  
   var titleImage = new Image()
   titleImage.src = ("pvlogo.png")
   var hairStylesImages = {}
   var playerAnimationImgs = []    
   var playerDeathImgs = []
+  var bloodDripImgs = []
   async function setUpPlayerAnimationImgs(){    
     for(i = 1; i <= 10; i ++){       
       await new Promise((resolve,reject)=>{
@@ -99,7 +133,17 @@
         }
       })                
     }
-
+    for(i = 1; i< 19; i++){
+      await new Promise((resolve, reject)=>{
+        var bloodDripImage = new Image()
+        bloodDripImage.src = "bloodDrip" + i +".png"
+        console.log("load" +i)
+        bloodDripImage.onload = () => {
+          bloodDripImgs.push(bloodDripImage)
+          resolve()
+        }
+      })
+    }
     for(i = 1; i <= 10; i ++){      
       for(j = 1; j <= 6; j++){
         await new Promise((resolve,reject)=>{
@@ -246,6 +290,7 @@
         }
     });
     canvas.addEventListener('click', (e)=> {
+      console.log("gameState:" + gameState)
       if(gameState == "loadingScreen"){
       if (e.offsetX > 200 && e.offsetX < 400 && e.offsetY > 330 && e.offsetY < 400){
         gameState = 'titleCard'
@@ -264,6 +309,47 @@
           vid.pause()
           startCoundown()
       }
+    } else if (gameState == "deathScreen"){
+    console.log(e.offsetY)
+      if(e.offsetY < 360 && e.offsetY > 310){
+        console.log("retry")
+        for (i = 0; i <= 100; i ++){
+          var npc = npcs[i]
+          npc.x = getRandomInt(0, 640)
+          npc.y = getRandomInt(0, 480) - 250
+          npc.deathAnimationIndex = 0
+          npc.deathAnimationIndexPart2 = 0
+          npc.hairIndex = getRandomInt(1,7)
+          npc.alive = true
+        }
+        
+        //var player = {x: 310, y: 250, alive: true, momentumX:0, momentumY:0, animationIndex:0, animationDrawFilpped:false, hairIndex: getRandomInt(1, 7), animationIndex:0}
+        player.x = 310
+        player.y = 250
+        player.alive=true
+        player.momentumX = 0
+        player.momentumY = 0
+        player.animationIndex = 0
+        player.animationDrawFilpped = false
+        player.hairIndex = getRandomInt(1,7)
+        z = 0
+        newBloodDripIndex = 0
+        oldBloodDripIndex = 0
+        deathAnimationIndex = 0
+        textAlpha = 0
+        whiteFlashIndex = 5
+        round1.pause()
+        round1.currentTime = 0
+        sandTextureY = ORIGINAL_SAND_Y
+        sandTextureX = ORIGINAL_SAND_X
+        countDownSecondsLeft = 179
+        
+        deathMessagesIndex = getRandomInt(1, 8)
+        gameState = "redLightGreenLight"
+        state = "greemLight"
+        redLightGreenLight()
+      }
+    
     }
     
 
@@ -335,12 +421,59 @@
       })
 
     }
+    z = 0
+    whiteFlashIndex = 5
+    oldBloodDripIndex = 0
+    newBloodDripIndex = 1
+    textAlpha = 0
+    function deathScene(){
+      
+      
+      ctx.globalAlpha = 0.7;
+      ctx.drawImage(bloodOverlay, 0, 0)
+      ctx.globalAlpha = 1;
+    
+      ctx.drawImage(bloodDripImgs[newBloodDripIndex], 0, 0)
+
+      if(whiteFlashIndex > 0 && Math.random() >.5  ){
+        ctx.fillStyle = 'rgba(255, 255, 255, 1)'
+        ctx.fillRect(0, 0, 640, 480)
+        whiteFlashIndex = whiteFlashIndex - 1
+      }else{
+        ctx.fillStyle = 'rgba(0, 0, 0,' + z +')';      
+        ctx.fillRect(0, 0, 640, 480)
+      }
 
 
-    var sandTextureY = -3601.7
-    var sandTextureX = -250
+      oldBloodDripIndex = oldBloodDripIndex + .2
+      if(oldBloodDripIndex >= 1 && newBloodDripIndex < 17){
+        oldBloodDripIndex = 0;
+        newBloodDripIndex++
+      }
+      z = z + 0.01;
+      if (z>=.5){
+        round1.play()
+      }
+
+      if(z >= .7){
+        textAlpha = textAlpha + 0.01
+
+        ctx.font = "35px calc"
+
+        ctx.fillStyle = 'rgba(255, 0, 0,' + textAlpha +')'
+        ctx.fillText("\""+deathMessages[deathMessagesIndex]+"\"", 70, 160)
+        ctx.font = "50px calc"
+        ctx.fillText("retry", 255, 360)
+        ctx.fillText("menu", 255, 430)
+        
+      }
+      
+    }
+
+
+
     var previewX =  100
-    var countDownSecondsLeft = 119
+    var countDownSecondsLeft = 179
     function startCoundown(){
       setInterval( ()=> {
         countDownSecondsLeft --
@@ -366,8 +499,10 @@
 //ctx.drawImage(previewBackground, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 ) 
   //    ctx.drawImage(previewDollLooking, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 ) 
      
-
-    let state = "greenLight"   
+    let yellowGlow = .6
+    let redGlow = .6
+    let state = "greenLight"  
+    let greenGlow = .6
     let startDelay = false
     function preview(){
       var percentX = player.x / canvas.width
@@ -375,14 +510,27 @@
       if (state == 'greenLight'){
         ctx.drawImage(previewBackground, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 ) 
         ctx.drawImage(previewDollNotLooking, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 )
+        yellowGlow = .6
+        ctx.fillStyle = "rgba(0,255,0," + greenGlow +")"
+        ctx.fillRect(0, 0, 640, 480)
+        greenGlow = greenGlow - .05
       }
       if(state =="yellowLight"){
         ctx.drawImage(previewBackground, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 ) 
         ctx.drawImage(previewDollTurning, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 ) 
+        ctx.fillStyle = "rgba(255,255,0," + yellowGlow +")"
+        ctx.fillRect(0, 0, 640, 480)
+        yellowGlow = yellowGlow - .05
+        greenGlow = .6
+        redGlow = .6
       }
       if(state == "redLight"){
         ctx.drawImage(previewBackground, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 ) 
         ctx.drawImage(previewDollLooking, previewX * percentX, 0, 100, 100, 530, 370, 100, 100 ) 
+        yellowGlow = .6
+        ctx.fillStyle = "rgba(255,0,0," + redGlow +")"
+        ctx.fillRect(0, 0, 640, 480)
+        redGlow = redGlow - .05
       }
       if(!startDelay && state == "greenLight"){
         startDelay = true
@@ -408,8 +556,10 @@
 
       ctx.fillStyle = 'red'
       ctx.font = "50px calc"   
-      var countDownSecondsLeftExtra = countDownSecondsLeft   
-      if (countDownSecondsLeft > 69&& countDownSecondsLeft < 120){
+      var countDownSecondsLeftExtra = countDownSecondsLeft 
+      if (countDownSecondsLeft > 119){
+        ctx.fillText("02:" + (countDownSecondsLeftExtra - 120), 520, 40)
+      } else if (countDownSecondsLeft > 69&& countDownSecondsLeft < 120){
         ctx.fillText("01:" + (countDownSecondsLeftExtra - 60), 520, 40)
       } else if (countDownSecondsLeft > 59&& countDownSecondsLeft < 70){
         ctx.fillText("01:0" + (countDownSecondsLeftExtra - 60), 520, 40)
@@ -421,6 +571,7 @@
       //draw player speed
       ctx.font = "20px calc" 
       ctx.fillText("player speed: " + player.momentumY, 480, 80)
+
     }
 
    async function redLightGreenLight(){
@@ -438,20 +589,34 @@
       }
       
       ctx.drawImage(sandTexture, sandTextureX, sandTextureY)
-
+      await drawNpcs()
       if(player.alive){
        await drawPlayer();
       }else{
         await drawDeadPlayer()
       }
-      await drawNpcs()
+      
       
       preview()
+      if(drawDeathSplat){
+        ctx.globalAlpha = drawDeathSplatAlpha
+        ctx.drawImage(bloodOverlay2, 0, 0)
+        ctx.globalAlpha = 1
+    }
+    if(sandTextureY >= -335){
+      playerWon = true
+    }
+            if(!player.alive){
+      deathScene()
+    }
+    if (playerWon){winScene()}
     }
     var deathAnimationIndex = 0
     var deathAnimationIndexPart2 = 0
+
     function drawDeadPlayer(){
       ctx.fillStyle = 'red';
+      
       
       ctx.drawImage(playerDeathImgs[deathAnimationIndex], player.x - 60, player.y, 120, 90)
       if (deathAnimationIndex < 11){
@@ -461,42 +626,112 @@
           deathAnimationIndexPart2 = 0
         }
       }
+      
     }    
+    var winScreenAlpha = 0
+    function winScene(){
 
+      ctx.fillStyle = "rgba(0,0,0," + winScreenAlpha +")"
+      ctx.fillRect(0,0,640,480)
+      ctx.fillStyle = "rgba(255,0,0," + winScreenAlpha +")"
+      ctx.font = "60px calc"
+      ctx.fillText("thanks for playing!", 20, 250)
+      winScreenAlpha = winScreenAlpha + .02
+      
+    }
 
     // ------------DRAWING PLAYTER AND NPCS-------------
 
-
     async function drawNpcs(){
-      for(i=0;i<npcs.length;i++){
-        var cureentNpc = npcs[i];
-        // PLAYER DRAWING
-        // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
-        const oldImageData = playerAnimationImgs[cureentNpc.animationIndex]
-        const newImageData = new ImageData(50,70)
-        const oldHairData = hairStylesImages[cureentNpc.hairIndex][cureentNpc.animationIndex]
-        const newHairData = new ImageData(50,70)
+      var deltaY = sandTextureY - ORIGINAL_SAND_Y
+      var deltaX = sandTextureX - ORIGINAL_SAND_X
+      npcs.sort((a,b) => { return a.y - b.y} )
+      npcs.sort((a,b) => { return a.alive} )
       
-        for (ix = 0; ix < 50; ix++) {
-          for (iy = 0; iy < 70; iy++) {
-            const color = getColorAtPos(oldImageData.data, ix, iy, 50);
-            const pos = cureentNpc.animationDrawFilpped ? 49 - ix: ix;        
-            setColorAtPos(newImageData.data, pos, iy, 50, color);
-
-            const hColor = getColorAtPos(oldHairData.data, ix, iy, 50)
-            const hPos  = cureentNpc.animationDrawFilpped ? 49 - ix: ix;
-            setColorAtPos(newHairData.data, hPos, iy, 50, hColor);
-          }
+      for(i=0;i<npcs.length;i++){
+        var currentNpc = npcs[i];
+        //5% of the time the npc's start
+        if (state == "greenLight" && getRandomInt(0,100) <= 5 && currentNpc.alive){
+          
+          currentNpc.running = true
+          currentNpc.speed = Math.random() * 3
+          currentNpc.xDirection = Math.random()>.5? 1:-1;          
         }
-        //ctx.drawImage(playerAnimationImgs[player.animationIndex], 52, 18, 108, 178, player.x, player.y, -50, 70)    
-        //ctx.drawImage(playerAnimationImgs[player.animationIndex], player.x, player.y)  
-        const bmp = await createImageBitmap(newImageData);
-        ctx.drawImage(bmp, cureentNpc.x, cureentNpc.y)
-        const hBmp = await createImageBitmap(newHairData)
-        ctx.drawImage(hBmp, cureentNpc.x, cureentNpc.y)
+        if (state == "yellowLight" && getRandomInt(0, 10) == 1){
+          currentNpc.running = false
+        }
+
+        if (currentNpc.running == true){
+          // detect if the player is moving (in which case adjust the npc accordingly)
+          currentNpc.animationIndex++
+          if (currentNpc.animationIndex > 9){
+            currentNpc.animationIndex = 0;
+            currentNpc.animationDrawFilpped = !currentNpc.animationDrawFilpped;    
+          }
+          currentNpc.x = currentNpc.x + (currentNpc.xDirection * (currentNpc.speed / 2))
+          currentNpc.y = currentNpc.y - currentNpc.speed
+          
+        }
+        if (state == "redLight" && currentNpc.running == true && Math.random()<.03){
+          var gunSound = new Audio("gunSound.mp3")
+          gunSound.play()
+          currentNpc.alive = false
+          currentNpc.running = false
+
+        }
+        if (currentNpc.alive){
+          // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
+          const oldImageData = playerAnimationImgs[currentNpc.animationIndex]
+          const newImageData = new ImageData(50,70)
+          const oldHairData = hairStylesImages[currentNpc.hairIndex][currentNpc.animationIndex]
+          const newHairData = new ImageData(50,70)
+        
+          for (ix = 0; ix < 50; ix++) {
+            for (iy = 0; iy < 70; iy++) {
+              const color = getColorAtPos(oldImageData.data, ix, iy, 50);
+              const pos = currentNpc.animationDrawFilpped ? 49 - ix: ix;        
+              setColorAtPos(newImageData.data, pos, iy, 50, color);
+
+              const hColor = getColorAtPos(oldHairData.data, ix, iy, 50)
+              const hPos  = currentNpc.animationDrawFilpped ? 49 - ix: ix;
+              setColorAtPos(newHairData.data, hPos, iy, 50, hColor);
+            }
+          }
+          //ctx.drawImage(playerAnimationImgs[player.animationIndex], 52, 18, 108, 178, player.x, player.y, -50, 70)    
+          //ctx.drawImage(playerAnimationImgs[player.animationIndex], player.x, player.y)  
+          
+          const bmp = await createImageBitmap(newImageData);
+          ctx.drawImage(bmp, currentNpc.x+deltaX, currentNpc.y+deltaY)
+          const hBmp = await createImageBitmap(newHairData)
+          ctx.drawImage(hBmp, currentNpc.x+deltaX, currentNpc.y+deltaY)
+      
+      } else {
+          ctx.drawImage(playerDeathImgs[currentNpc.deathAnimationIndex], currentNpc.x - 60 + deltaX, currentNpc.y + deltaY, 120, 90)
+          if (currentNpc.deathAnimationIndex < 11){
+            currentNpc.deathAnimationIndexPart2 ++
+            if (currentNpc.deathAnimationIndexPart2 >= 3){
+              currentNpc.deathAnimationIndex ++
+              currentNpc.deathAnimationIndexPart2 = 0
+            }
+          }
+
+          if (Math.abs(player.x - currentNpc.x) < 200 && Math.abs(player.y - currentNpc.y) < 200 && currentNpc.deathAnimationIndex < 5){
+            const alphaReduction = ( currentNpc.deathAnimationIndex * 2)/10
+            //var drawDeathSplat = false
+            //var drawDeathSplatAlpha = 1
+            bloodOverlay2Alpha = 1 - alphaReduction
+            //ctx.globalAlpha = bloodOverlay2Alpha
+            //ctx.drawImage(bloodOverlay2, 0, 0)
+            //ctx.globalAlpha = 1
+            drawDeathSplat = true
+            drawDeathSplatAlpha = bloodOverlay2Alpha
+          }
+
       }
+      }
+      
     }
-    
+    let bloodOverlay2Alpha = 1
     async function  drawPlayer() {
 
     //round decimals to stop player from floating away.
@@ -506,13 +741,23 @@
     player.x += player.momentumX
     
    if (state == "redLight" && player.momentumY != 0){
-    player.alive = false;
+    if (sandTextureY < -335){
+      player.alive = false
+
+    } 
+
+    gameState = "deathScreen"
     gunSound.play()
    }
    if (state == "redLight" && player.momentumX != 0){
-    player.alive = false;
+    if (sandTextureY < -335){
+      player.alive = false;
+
+    }
+    gameState = "deathScreen"
     gunSound.play()
    }
+
     if (player.y < 200 && sandTextureY < 0){
       player.y -= player.momentumY
       sandTextureY -= player.momentumY
@@ -630,7 +875,11 @@
     ctx.drawImage(bmp, player.x, player.y)
     const hBmp = await createImageBitmap(newHairData)
     ctx.drawImage(hBmp, player.x, player.y)
-    
+    ctx.fillStyle = "red"
+    ctx.font = "20px calc"
+    ctx.fillText("you", (player.x + 10), (player.y - 5))
+
+
   }
   function getColorAtPos(array, x, y, width) {
     var p = 4 * (x + y * width);
@@ -665,6 +914,7 @@ async function setUp() {
 
   }, CALLRATE)
 }
+
 setUp()
 
 
