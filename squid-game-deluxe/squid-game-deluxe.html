@@ -6,6 +6,7 @@
   </head>
   <body>
   <canvas id="gameCanvas" width="640" height="480"></canvas>
+
 </body>
 </html>
 <script>
@@ -42,6 +43,47 @@
   var l = 0
   var e = 0
   var b = 0
+  // Add fullscreen button
+  const fullscreenBtn = document.createElement('button');
+  fullscreenBtn.textContent = 'Fullscreen';
+  fullscreenBtn.style.position = 'absolute';
+  fullscreenBtn.style.top = '10px';
+  fullscreenBtn.style.right = '10px';
+  fullscreenBtn.style.zIndex = 1000;
+  document.body.appendChild(fullscreenBtn);
+
+  // Set background to black
+  document.body.style.background = 'black';
+
+  fullscreenBtn.addEventListener('click', () => {
+    if (canvas.requestFullscreen) {
+      canvas.requestFullscreen();
+    } else if (canvas.webkitRequestFullscreen) { // Safari
+      canvas.webkitRequestFullscreen();
+    } else if (canvas.msRequestFullscreen) { // IE11
+      canvas.msRequestFullscreen();
+    }
+    fullscreenBtn.style.display = 'none';
+  });
+
+  // Restore button when exiting fullscreen
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) {
+      fullscreenBtn.style.display = '';
+    }
+  });
+
+  // Utility to get mouse position relative to canvas regardless of fullscreen or scaling
+  function getCanvasRelativePosition(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY
+    };
+  }
+
 
   var drawDeathSplat = false
   var drawDeathSplatAlpha = 1
@@ -136,8 +178,7 @@
     for(i = 1; i< 19; i++){
       await new Promise((resolve, reject)=>{
         var bloodDripImage = new Image()
-        bloodDripImage.src = "bloodDrip" + i +".png"
-        console.log("load" +i)
+        bloodDripImage.src = "bloodDrip" + i +".png"        
         bloodDripImage.onload = () => {
           bloodDripImgs.push(bloodDripImage)
           resolve()
@@ -290,69 +331,62 @@
         }
     });
     canvas.addEventListener('click', (e)=> {
-      console.log("gameState:" + gameState)
+      const pos = getCanvasRelativePosition(e);          
       if(gameState == "loadingScreen"){
-      if (e.offsetX > 200 && e.offsetX < 400 && e.offsetY > 330 && e.offsetY < 400){
-        gameState = 'titleCard'
-      }
-    } else if(gameState == "titleCard"){
-      if (e.offsetX > titleForegroundPosition.x + 440 && e.offsetX < titleForegroundPosition.x + 580 && e.offsetY > titleForegroundPosition.y + 270 && e.offsetY < titleForegroundPosition.y + 340){
-        gameState = "redLightGreenLight"
-      }
-    } else if (gameState == "redLightGreenLight"){
-      if (e.offsetX > 450 && e.offsetX < 570 && e.offsetY > 423 && e.offsetY < 473) {
-          
+        if (pos.x > 200 && pos.x < 400 && pos.y > 330 && pos.y < 400){
+          gameState = 'titleCard'
+        }
+      } else if(gameState == "titleCard"){
+        if (pos.x > titleForegroundPosition.x + 440 && pos.x < titleForegroundPosition.x + 580 && pos.y > titleForegroundPosition.y + 270 && pos.y < titleForegroundPosition.y + 340){
+          gameState = "redLightGreenLight"
+        }
+      } else if (gameState == "redLightGreenLight"){
+        if (pos.x > 450 && pos.x < 570 && pos.y > 423 && pos.y < 473) {
           cutsceneSetUpComplete = true
           clearInterval(updateCutsceneInterval)
           cutscene1 = false
           var vid = document.getElementsByTagName("video")[0]
           vid.pause()
           startCoundown()
-      }
-    } else if (gameState == "deathScreen"){
-    console.log(e.offsetY)
-      if(e.offsetY < 360 && e.offsetY > 310){
-        console.log("retry")
-        for (i = 0; i <= 100; i ++){
-          var npc = npcs[i]
-          npc.x = getRandomInt(0, 640)
-          npc.y = getRandomInt(0, 480) - 250
-          npc.deathAnimationIndex = 0
-          npc.deathAnimationIndexPart2 = 0
-          npc.hairIndex = getRandomInt(1,7)
-          npc.alive = true
         }
-        
-        //var player = {x: 310, y: 250, alive: true, momentumX:0, momentumY:0, animationIndex:0, animationDrawFilpped:false, hairIndex: getRandomInt(1, 7), animationIndex:0}
-        player.x = 310
-        player.y = 250
-        player.alive=true
-        player.momentumX = 0
-        player.momentumY = 0
-        player.animationIndex = 0
-        player.animationDrawFilpped = false
-        player.hairIndex = getRandomInt(1,7)
-        z = 0
-        newBloodDripIndex = 0
-        oldBloodDripIndex = 0
-        deathAnimationIndex = 0
-        textAlpha = 0
-        whiteFlashIndex = 5
-        round1.pause()
-        round1.currentTime = 0
-        sandTextureY = ORIGINAL_SAND_Y
-        sandTextureX = ORIGINAL_SAND_X
-        countDownSecondsLeft = 179
-        
-        deathMessagesIndex = getRandomInt(1, 8)
-        gameState = "redLightGreenLight"
-        state = "greemLight"
-        redLightGreenLight()
+      } else if (gameState == "deathScreen"){
+        console.log(pos.y)
+        if(pos.y < 360 && pos.y > 310){
+          console.log("retry")
+          for (i = 0; i <= 100; i ++){
+            var npc = npcs[i]
+            npc.x = getRandomInt(0, 640)
+            npc.y = getRandomInt(0, 480) - 250
+            npc.deathAnimationIndex = 0
+            npc.deathAnimationIndexPart2 = 0
+            npc.hairIndex = getRandomInt(1,7)
+            npc.alive = true
+          }
+          player.x = 310
+          player.y = 250
+          player.alive=true
+          player.momentumX = 0
+          player.momentumY = 0
+          player.animationIndex = 0
+          player.animationDrawFilpped = false
+          player.hairIndex = getRandomInt(1,7)
+          z = 0
+          newBloodDripIndex = 0
+          oldBloodDripIndex = 0
+          deathAnimationIndex = 0
+          textAlpha = 0
+          whiteFlashIndex = 5
+          round1.pause()
+          round1.currentTime = 0
+          sandTextureY = ORIGINAL_SAND_Y
+          sandTextureX = ORIGINAL_SAND_X
+          countDownSecondsLeft = 179
+          deathMessagesIndex = getRandomInt(1, 8)
+          gameState = "redLightGreenLight"
+          state = "greemLight"
+          redLightGreenLight()
+        }
       }
-    
-    }
-    
-
     })
 
     document.addEventListener('mousemove', function(e) {
@@ -398,8 +432,8 @@
 
 
       ctx.fillStyle = 'black'
-    ctx.font = '50px Impact'
-    ctx.fillText("skip",  463,  466)
+      ctx.font = '50px Impact'
+      ctx.fillText("skip",  463,  466)
     }
 
 
