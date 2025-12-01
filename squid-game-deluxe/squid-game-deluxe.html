@@ -2,12 +2,32 @@
 <html>
   <head>
     <title>Squid Game Deluxe</title>
+    <style>
 
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        transform: scaleX(1); /* Adjust the aspect ratio by stretching horizontally */
+        transform: scaleY(.92); /* Adjust the aspect ratio by stretching horizontally */
+        transform-origin: center;
+      }
+    </style>
   </head>
   <body>
-  <canvas id="gameCanvas" width="640" height="480"></canvas>
-
-</body>
+    <div class="fullscreen-wrapper">
+      <canvas id="gameCanvas" width="640" height="480"></canvas>
+    </div>
+  </body>
 </html>
 <script>
     function getRandomInt(min, max) {
@@ -56,12 +76,11 @@
   document.body.style.background = 'black';
 
   fullscreenBtn.addEventListener('click', () => {
-    if (canvas.requestFullscreen) {
-      canvas.requestFullscreen();
-    } else if (canvas.webkitRequestFullscreen) { // Safari
-      canvas.webkitRequestFullscreen();
-    } else if (canvas.msRequestFullscreen) { // IE11
-      canvas.msRequestFullscreen();
+    let wrapper = document.querySelector('.fullscreen-wrapper');
+    wrapper.style.width = '100%';
+    wrapper.style.height = '100%';
+    if (wrapper.requestFullscreen) {
+      wrapper.requestFullscreen();
     }
     fullscreenBtn.style.display = 'none';
   });
@@ -384,6 +403,7 @@
           deathMessagesIndex = getRandomInt(1, 8)
           gameState = "redLightGreenLight"
           state = "greemLight"
+          drawDeathSplatAlpha = 0
           redLightGreenLight()
         }
       }
@@ -592,15 +612,15 @@
       ctx.font = "50px calc"   
       var countDownSecondsLeftExtra = countDownSecondsLeft 
       if (countDownSecondsLeft > 119){
-        ctx.fillText("02:" + (countDownSecondsLeftExtra - 120), 520, 40)
+        ctx.fillText("02:" + (countDownSecondsLeftExtra - 120), 490, 40)
       } else if (countDownSecondsLeft > 69&& countDownSecondsLeft < 120){
-        ctx.fillText("01:" + (countDownSecondsLeftExtra - 60), 520, 40)
+        ctx.fillText("01:" + (countDownSecondsLeftExtra - 60), 490, 40)
       } else if (countDownSecondsLeft > 59&& countDownSecondsLeft < 70){
-        ctx.fillText("01:0" + (countDownSecondsLeftExtra - 60), 520, 40)
+        ctx.fillText("01:0" + (countDownSecondsLeftExtra - 60), 490, 40)
       } else if(countDownSecondsLeft > 9 && countDownSecondsLeft < 60){
-        ctx.fillText("00:"+countDownSecondsLeft, 520, 40)
+        ctx.fillText("00:"+countDownSecondsLeft, 490, 40)
 
-      } else {ctx.fillText("00:0"+countDownSecondsLeft, 520, 40)}
+      } else {ctx.fillText("00:0"+countDownSecondsLeft, 490, 40)}
       
       //draw player speed
       ctx.font = "20px calc" 
@@ -643,6 +663,7 @@
             if(!player.alive){
       deathScene()
     }
+    if(countDownSecondsLeft == 0){player.alive = false}
     if (playerWon){winScene()}
     }
     var deathAnimationIndex = 0
@@ -706,7 +727,7 @@
           currentNpc.y = currentNpc.y - currentNpc.speed
           
         }
-        if (state == "redLight" && currentNpc.running == true && Math.random()<.03){
+        if (state == "redLight" && currentNpc.running == true && Math.random()<.03 || countDownSecondsLeft == 0){
           var gunSound = new Audio("gunSound.mp3")
           gunSound.play()
           currentNpc.alive = false
